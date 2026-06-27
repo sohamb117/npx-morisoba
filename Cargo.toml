@@ -1,5 +1,5 @@
 [workspace]
-members = ["morisoba"]
+members = ["morisoba", "morisoba-wasm"]
 resolver = "2"
 
 [workspace.metadata]

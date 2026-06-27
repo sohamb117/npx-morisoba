@@ -1127,6 +1127,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "morisoba-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "morisoba",
+ "ratatui",
+ "ratzilla",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
