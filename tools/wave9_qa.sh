@@ -189,7 +189,7 @@ tmux -L S7 send-keys -t tui "$BIN" Enter
 sleep 1.0
 tmux -L S7 capture-pane -t tui -p -e > "$QA/S7.ansi"
 S7OK=1
-if grep -Pq '\x1b\[(?:[0-9;]*;)?(3[0-7]|4[0-7]|9[0-7]|10[0-7]|38;5|48;5|38;2|48;2)' "$QA/S7.ansi"; then
+if grep -Pq '\x1b\[(?:[0-9;]*;)?(3[0-7]|4[0-7]|9[0-7]|10[0-7]|38;5;(?!23[2-9]|24\d|25[0-5])\d+|48;5|38;2|48;2)' "$QA/S7.ansi"; then
     echo "  forbidden color SGR present. Distinct codes:"
     grep -Po '\x1b\[[0-9;]*m' "$QA/S7.ansi" | sort -u | head -20
     S7OK=0

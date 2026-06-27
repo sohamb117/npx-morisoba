@@ -18,7 +18,7 @@ const HEADER_HEIGHT: u16 = 5;
 const FOOTER_HEIGHT: u16 = 1;
 const NAV_WIDTH: u16 = 22;
 
-pub fn render(frame: &mut Frame, app: &mut App, hero_ascii: Option<&str>) {
+pub fn render(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'_>>) {
     match app.view {
         View::Menu { pane } => render_menu_view(frame, app, hero_ascii, pane),
         View::Detail {
@@ -55,9 +55,9 @@ fn split_detail_halves(area: Rect) -> [Rect; 2] {
     Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area)
 }
 
-fn render_hero(frame: &mut Frame, area: Rect, hero_ascii: Option<&str>) {
+fn render_hero(frame: &mut Frame, area: Rect, hero_ascii: Option<&Text<'_>>) {
     let widget = if let Some(text) = hero_ascii {
-        Paragraph::new(text).block(Block::bordered().title("// HERO"))
+        Paragraph::new(text.clone()).block(Block::bordered().title("// HERO"))
     } else {
         Paragraph::new("[ HERO ]")
             .alignment(Alignment::Center)
@@ -122,7 +122,7 @@ fn render_footer(frame: &mut Frame, area: Rect, view: View) {
     frame.render_widget(Paragraph::new(text).alignment(Alignment::Left), area);
 }
 
-fn render_menu_view(frame: &mut Frame, app: &mut App, hero_ascii: Option<&str>, pane: Pane) {
+fn render_menu_view(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'_>>, pane: Pane) {
     let [hero, header, content, footer] = root_with_hero(frame.size());
     render_hero(frame, hero, hero_ascii);
     render_header(frame, header);
@@ -141,7 +141,7 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
         let [left, right] = split_detail_halves(content);
 
         let ascii_text = pick_detail_ascii(item, crate::content::HERO_ASCII, crate::content::HERO_PNG)
-            .unwrap_or_else(|| "[ NO IMAGE ]".to_string());
+            .unwrap_or_else(|| Text::from("[ NO IMAGE ]"));
         let ascii_widget = Paragraph::new(ascii_text)
             .block(Block::bordered().title("// IMAGE"))
             .alignment(Alignment::Left);
@@ -158,23 +158,23 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
 
 pub(crate) fn pick_detail_ascii(
     item: &crate::content::Item,
-    hero_ascii: Option<&str>,
+    hero_ascii: Option<&'static str>,
     hero_png: Option<&[u8]>,
-) -> Option<String> {
+) -> Option<Text<'static>> {
     if let Some(art) = item.ascii {
-        return Some(art.to_string());
+        return Some(Text::raw(art));
     }
     if let Some(b) = item.png_bytes {
-        if let Some(s) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
-            return Some(s);
+        if let Some(t) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
+            return Some(t);
         }
     }
     if let Some(art) = hero_ascii {
-        return Some(art.to_string());
+        return Some(Text::raw(art));
     }
     if let Some(b) = hero_png {
-        if let Some(s) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
-            return Some(s);
+        if let Some(t) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
+            return Some(t);
         }
     }
     None
@@ -189,7 +189,7 @@ mod tests {
     use ratatui::style::{Color, Modifier};
     use ratatui::Terminal;
 
-    fn render_view(width: u16, height: u16, app: &mut App, hero: Option<&str>) -> Buffer {
+    fn render_view(width: u16, height: u16, app: &mut App, hero: Option<&Text<'_>>) -> Buffer {
         let backend = TestBackend::new(width, height);
         let mut terminal = Terminal::new(backend).expect("test terminal");
         terminal
@@ -390,8 +390,8 @@ mod tests {
     #[test]
     fn menu_view_renders_with_hero_text() {
         let mut a = App::new();
-        let hero = "######\n@@@@@@\n......";
-        let _ = render_view(120, 40, &mut a, Some(hero));
+        let hero = Text::raw("######\n@@@@@@\n......");
+        let _ = render_view(120, 40, &mut a, Some(&hero));
     }
 
     #[test]
@@ -443,11 +443,24 @@ mod tests {
         }
     }
 
+    fn text_plain(t: &Text) -> String {
+        let mut s = String::new();
+        for (i, line) in t.lines.iter().enumerate() {
+            if i > 0 {
+                s.push('\n');
+            }
+            for span in &line.spans {
+                s.push_str(&span.content);
+            }
+        }
+        s
+    }
+
     #[test]
     fn pick_detail_ascii_prefers_item_ascii_over_item_png() {
         let item = mk_item(Some(b"NOT_A_REAL_PNG"), Some("PRE_RENDERED"));
         let result = pick_detail_ascii(&item, None, None);
-        assert_eq!(result.as_deref(), Some("PRE_RENDERED"));
+        assert_eq!(text_plain(&result.unwrap()), "PRE_RENDERED");
     }
 
     #[test]
@@ -462,7 +475,7 @@ mod tests {
     fn pick_detail_ascii_falls_back_to_hero_ascii_when_item_empty() {
         let item = mk_item(None, None);
         let result = pick_detail_ascii(&item, Some("HERO_FALLBACK"), None);
-        assert_eq!(result.as_deref(), Some("HERO_FALLBACK"));
+        assert_eq!(text_plain(&result.unwrap()), "HERO_FALLBACK");
     }
 
     #[test]

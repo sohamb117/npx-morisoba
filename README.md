@@ -128,26 +128,27 @@ Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. **Or** place
 PNG bytes and `.txt` content are **embedded at compile time** via `include_bytes!` and a build-script text reader (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render identically.
 
 - **PNG limits**: up to **2048×2048** pixels, **10 MiB** file size. Larger images are rejected at decode time to bound CPU.
-- **PNG rendering**: pixels are mapped to the ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` via Luma8 conversion and Lanczos3 downscale.
-- **`.txt` handling**: embedded verbatim with CRLF → LF normalization at build time. No size cap (you control your own binary bloat).
+- **PNG rendering**: **aspect-preserving** Lanczos3 fit inside the target cell box (portraits stay portrait, landscapes stay landscape — no distortion). Each pixel maps to one of the brutalist 10-char ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` AND one of **24 grayscale FG levels** from the 256-color palette (codes 232..=255). Ramp char = structural texture; grayscale = smooth luminance.
+- **`.txt` handling**: embedded verbatim with CRLF → LF normalization at build time. Renders as plain Text without per-cell grayscale (you control the styling by choosing characters). No size cap.
 - **Full image** (`i` key): the embedded **PNG** bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened in the OS-default viewer. `.txt`-only items fall back to the hero PNG; if there is no PNG anywhere, `i` silently no-ops.
 - **Missing hero at build time**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
 
 ## SPEC EXTENSIONS
 
-This implementation extends the original brief in four intentional, additive ways:
+This implementation extends the original brief in five intentional, additive ways:
 
 - **`j` / `k` / `l` / `h` navigation aliases** — vim-style alongside arrow keys. Both pairs map to the same logic.
 - **`i` opens the original image** in the OS-default viewer. Lets users see the full-resolution asset outside the terminal.
 - **Footer key-hint row** — the bottom row shows context-sensitive hints per pane focus. The brief specified a 3-region root layout; the footer is added as a 4th fixed-height region for first-launch discoverability.
 - **Two-view menu UX** — single MENU view with focused-pane semantics (section nav left, items right, both always visible; right pane updates live on section navigation) plus DETAIL view. The brief specified static section content; this adds item-granularity with markdown bodies and per-item ASCII art while preserving a single-screen "menu with submenu" feel.
+- **Grayscale ASCII rendering** — Per-pixel foreground from the 256-color grayscale palette (codes 232..=255 = 24 pure-achromatic luminance levels) is layered over the brutalist 10-char ramp for smooth gradients on decoded PNGs. All other UI chrome (borders, list highlights, footer, header, hand-authored `.txt` art) remains pure B/W via reverse-video. Wave 9 S7 enforces the carveout: chromatic SGR codes still cause the harness to fail.
 
 `Esc` is context-sensitive: in section-pane focus it is a no-op (`q` remains the only documented quit key, per the brief); in item-pane focus it shifts focus back to the section pane; in DETAIL view it returns to MENU (item pane focus). Alongside Backspace / h / ←.
 
 ## TESTING
 
 ```bash
-cargo test         # 54 unit + integration tests
+cargo test         # 57 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 

@@ -10,6 +10,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::backend::CrosstermBackend;
+use ratatui::text::Text;
 use ratatui::Terminal;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -22,13 +23,13 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 fn main() -> io::Result<()> {
     install_panic_hook();
 
-    let hero_ascii: Option<String> = content::HERO_ASCII.map(str::to_string).or_else(|| {
+    let hero_ascii: Option<Text<'static>> = content::HERO_ASCII.map(Text::raw).or_else(|| {
         content::HERO_PNG.and_then(|bytes| renderer::ascii::load_and_render_bytes(bytes, 60, 8))
     });
 
     let mut terminal = init_terminal()?;
     let mut app = App::new();
-    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_deref());
+    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_ref());
     let _ = restore_terminal();
     result
 }
@@ -63,7 +64,7 @@ fn install_panic_hook() {
     }));
 }
 
-fn run_loop(terminal: &mut Term, app: &mut App, hero_ascii: Option<&str>) -> io::Result<()> {
+fn run_loop(terminal: &mut Term, app: &mut App, hero_ascii: Option<&Text<'_>>) -> io::Result<()> {
     loop {
         terminal.draw(|frame| ui::render(frame, app, hero_ascii))?;
 
