@@ -2,6 +2,9 @@
 /target
 target/
 
+# Wave 9 scenario verification harness output
+.qa/
+
 # WSL out-of-tree target dir (we redirect cargo with CARGO_TARGET_DIR=$HOME/target_morisoba)
 # Local editor swap / OS junk
 *.swp
