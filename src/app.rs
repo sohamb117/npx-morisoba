@@ -32,12 +32,9 @@ impl Section {
 /// Result of dispatching a key press through `App::handle_key`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
-    /// Main loop should exit cleanly.
     Quit,
-    /// User pressed Enter on a section — currently a no-op but reserved
-    /// for future "open" gestures (e.g. detail view).
     Select,
-    /// Nothing observable happened (or selection changed via internal state).
+    OpenImage,
     Noop,
 }
 
@@ -45,6 +42,7 @@ pub enum Action {
 pub struct App {
     pub selected_section: usize,
     pub sections: Vec<Section>,
+    #[allow(dead_code)]
     pub mode: RenderMode,
     pub list_state: ListState,
 }
@@ -91,6 +89,7 @@ impl App {
                 Action::Noop
             }
             KeyCode::Enter => Action::Select,
+            KeyCode::Char('i') => Action::OpenImage,
             _ => Action::Noop,
         }
     }
@@ -189,6 +188,13 @@ mod tests {
     fn handle_key_enter_returns_select() {
         let mut a = fresh();
         assert_eq!(a.handle_key(KeyCode::Enter), Action::Select);
+    }
+
+    #[test]
+    fn handle_key_i_returns_open_image() {
+        let mut a = fresh();
+        assert_eq!(a.handle_key(KeyCode::Char('i')), Action::OpenImage);
+        assert_eq!(a.selected_section, 0);
     }
 
     #[test]
