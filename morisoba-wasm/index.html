@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MORISOBA :: A BRUTALIST PORTFOLIO</title>
+  <link data-trunk rel="rust" data-wasm-opt="z" />
+  <link data-trunk rel="css" href="style.css" />
+  <script data-trunk src="desktop.js"></script>
+</head>
+<body class="brutalist-desktop">
+  <div id="taskbar">
+    <span id="taskbar-title">MORISOBA :: A BRUTALIST PORTFOLIO TUI</span>
+    <span id="taskbar-help">DRAG TITLEBARS  |  [X] CLOSES IMAGE WINDOWS  |  Q QUITS</span>
+  </div>
+  <div id="desktop-root">
+    <div class="desktop-window" data-window-id="terminal">
+      <div class="desktop-titlebar">
+        <span class="desktop-title">MORISOBA :: TERMINAL</span>
+      </div>
+      <div class="desktop-body">
+        <div id="tui-mount"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

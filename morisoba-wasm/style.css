@@ -1,0 +1,155 @@
+/* MORISOBA brutalist desktop — pure B/W, 2px borders, monospace, no rounding, no shadow gradients */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.brutalist-desktop {
+  background: #000;
+  color: #fff;
+  font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.0;
+}
+
+/* Taskbar — fixed top strip */
+#taskbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: #fff;
+  color: #000;
+  border-bottom: 2px solid #fff;
+  font-family: inherit;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  z-index: 10000;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#taskbar-title { font-size: 14px; }
+#taskbar-help  { font-size: 11px; opacity: 0.7; }
+
+/* Desktop root — everything below the taskbar */
+#desktop-root {
+  position: fixed;
+  top: 28px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+}
+
+/* Window chrome */
+.desktop-window {
+  position: absolute;
+  background: #000;
+  border: 2px solid #fff;
+  box-shadow: 4px 4px 0 #fff;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  min-height: 200px;
+}
+
+/* Initial terminal window: explicit large dimensions to work around ratzilla #179 */
+.desktop-window[data-window-id="terminal"] {
+  top: 24px;
+  left: 24px;
+  width: calc(100vw - 64px);
+  height: calc(100vh - 80px);
+}
+
+.desktop-titlebar {
+  background: #fff;
+  color: #000;
+  cursor: move;
+  user-select: none;
+  font-family: inherit;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 0 0 auto;
+  border-bottom: 2px solid #000;
+}
+
+.desktop-title { font-size: 13px; }
+
+.desktop-close {
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 0 6px;
+  cursor: pointer;
+  line-height: 18px;
+}
+
+.desktop-close:hover {
+  background: #fff;
+  color: #000;
+}
+
+.desktop-body {
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #000;
+}
+
+/* tui-mount — explicit size so ratzilla measures cells correctly (workaround for issue #179) */
+#tui-mount {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  display: block;
+}
+
+#tui-mount pre {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Image windows */
+.image-window {
+  width: 480px;
+  height: 480px;
+}
+
+.image-window .desktop-body {
+  background: #000;
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-window img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
