@@ -47,6 +47,27 @@ morisoba
 
 The binary needs a real TTY for raw mode + alternate screen. Plain shell prompts, tmux panes, Windows Terminal, WezTerm, iTerm2, kitty — all work.
 
+## WEB
+
+morisoba runs in the browser as a WASM bundle via [ratzilla](https://github.com/ratatui/ratzilla) — same Rust source, different terminal backend. Each item's images open as draggable sibling windows in a brutalist HTML "desktop." Static hosting, no backend.
+
+**Live**: <https://morisoba.github.io/morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
+
+**Local dev**:
+
+```bash
+cd morisoba-wasm
+./build.sh                                  # produces dist/ (~270 KB gzipped wasm)
+python3 -m http.server --directory dist 8000
+# open http://localhost:8000
+```
+
+**Architecture**:
+
+- `morisoba-wasm/src/lib.rs` — `#[wasm_bindgen(start)]` entry; `DomBackend::new_by_id("tui-mount")`; translates `ratzilla::event::KeyCode` → `crossterm::event::KeyCode` so `morisoba::app::App::handle_key` is reused unchanged.
+- `morisoba-wasm/desktop.js` — ~150-line vanilla JS window manager. Brutalist `.desktop-window` chrome (2px borders, drag-by-titlebar, `[X]` close, cascade-offset spawn). `window.morisobaDesktop.spawn_image(bytes, slug)` is the JS↔WASM interop point for the `i` key.
+- `morisoba-wasm/build.sh` — bypasses trunk's mandatory `wasm-opt` step (binaryen ≤ 124 can't parse wasm-bindgen 0.2.126 output). When binaryen catches up, the [Trunk.toml](morisoba-wasm/Trunk.toml) config is ready for `trunk serve` hot-reload dev.
+
 ## CONTROLS
 
 The TUI has two views: **MENU** (split pane — sections list left, items-of-selected-section right) and **DETAIL** (split pane — ASCII art left, markdown body right).

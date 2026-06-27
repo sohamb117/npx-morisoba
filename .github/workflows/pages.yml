@@ -1,0 +1,66 @@
+name: Deploy WASM to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'morisoba/**'
+      - 'morisoba-wasm/**'
+      - 'assets/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: morisoba-wasm
+
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
+      - name: Build WASM bundle
+        run: |
+          WB_PATH="$(command -v wasm-bindgen)"
+          if [ -z "$WB_PATH" ]; then
+            echo "wasm-bindgen not on PATH after install"
+            exit 1
+          fi
+          export WASM_BINDGEN="$WB_PATH"
+          bash morisoba-wasm/build.sh
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: morisoba-wasm/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
