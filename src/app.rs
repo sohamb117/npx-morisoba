@@ -1,4 +1,4 @@
-//! Application state: which view is active, which section/item is selected.
+//! Application state: which view, which pane has focus, current selections.
 
 use crossterm::event::KeyCode;
 use ratatui::widgets::ListState;
@@ -23,9 +23,14 @@ impl Section {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pane {
+    Section,
+    Item,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
-    Sections,
-    Items { section_idx: usize },
+    Menu { pane: Pane },
     Detail { section_idx: usize, item_idx: usize },
 }
 
@@ -64,7 +69,9 @@ impl App {
         let mut item_list_state = ListState::default();
         item_list_state.select(Some(0));
         Self {
-            view: View::Sections,
+            view: View::Menu {
+                pane: Pane::Section,
+            },
             sections,
             section_list_state,
             item_list_state,
@@ -77,28 +84,25 @@ impl App {
 
     pub fn current_section(&self) -> Section {
         let idx = match self.view {
-            View::Sections => self.selected_section_idx(),
-            View::Items { section_idx } | View::Detail { section_idx, .. } => section_idx,
+            View::Menu { .. } => self.selected_section_idx(),
+            View::Detail { section_idx, .. } => section_idx,
         };
         self.sections[idx]
     }
 
     pub fn current_item(&self) -> Option<&'static crate::content::Item> {
-        match self.view {
-            View::Items { section_idx } => {
-                let items = crate::content::items_for(self.sections[section_idx]);
-                let idx = self.item_list_state.selected().unwrap_or(0);
-                items.get(idx)
-            }
+        let (section_idx, item_idx) = match self.view {
+            View::Menu { .. } => (
+                self.selected_section_idx(),
+                self.item_list_state.selected().unwrap_or(0),
+            ),
             View::Detail {
                 section_idx,
                 item_idx,
-            } => {
-                let items = crate::content::items_for(self.sections[section_idx]);
-                items.get(item_idx)
-            }
-            View::Sections => None,
-        }
+            } => (section_idx, item_idx),
+        };
+        let items = crate::content::items_for(self.sections[section_idx]);
+        items.get(item_idx)
     }
 
     pub fn handle_key(&mut self, code: KeyCode) -> Action {
@@ -108,20 +112,24 @@ impl App {
             _ => {}
         }
         match self.view {
-            View::Sections => self.handle_key_sections(code),
-            View::Items { section_idx } => self.handle_key_items(code, section_idx),
-            View::Detail { section_idx, .. } => self.handle_key_detail(code, section_idx),
+            View::Menu {
+                pane: Pane::Section,
+            } => self.handle_key_section_pane(code),
+            View::Menu { pane: Pane::Item } => self.handle_key_item_pane(code),
+            View::Detail { .. } => self.handle_key_detail(code),
         }
     }
 
-    fn handle_key_sections(&mut self, code: KeyCode) -> Action {
+    fn handle_key_section_pane(&mut self, code: KeyCode) -> Action {
         match code {
             KeyCode::Down | KeyCode::Char('j') => {
                 cycle_next(&mut self.section_list_state, self.sections.len());
+                self.item_list_state.select(Some(0));
                 Action::Noop
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 cycle_prev(&mut self.section_list_state, self.sections.len());
+                self.item_list_state.select(Some(0));
                 Action::Noop
             }
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
@@ -129,15 +137,15 @@ impl App {
                 if crate::content::items_for(self.sections[idx]).is_empty() {
                     return Action::Noop;
                 }
-                self.item_list_state.select(Some(0));
-                self.view = View::Items { section_idx: idx };
-                Action::Drill
+                self.view = View::Menu { pane: Pane::Item };
+                Action::Noop
             }
             _ => Action::Noop,
         }
     }
 
-    fn handle_key_items(&mut self, code: KeyCode, section_idx: usize) -> Action {
+    fn handle_key_item_pane(&mut self, code: KeyCode) -> Action {
+        let section_idx = self.selected_section_idx();
         let item_count = crate::content::items_for(self.sections[section_idx]).len();
         match code {
             KeyCode::Down | KeyCode::Char('j') => {
@@ -160,17 +168,19 @@ impl App {
                 Action::Drill
             }
             KeyCode::Backspace | KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
-                self.view = View::Sections;
+                self.view = View::Menu {
+                    pane: Pane::Section,
+                };
                 Action::Back
             }
             _ => Action::Noop,
         }
     }
 
-    fn handle_key_detail(&mut self, code: KeyCode, section_idx: usize) -> Action {
+    fn handle_key_detail(&mut self, code: KeyCode) -> Action {
         match code {
             KeyCode::Backspace | KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
-                self.view = View::Items { section_idx };
+                self.view = View::Menu { pane: Pane::Item };
                 Action::Back
             }
             _ => Action::Noop,
@@ -204,15 +214,20 @@ mod tests {
     }
 
     #[test]
-    fn starts_in_sections_view_with_about_selected() {
+    fn starts_in_menu_view_with_section_pane_focused_and_about_selected() {
         let a = fresh();
-        assert!(matches!(a.view, View::Sections));
+        assert_eq!(
+            a.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        );
         assert_eq!(a.selected_section_idx(), 0);
         assert_eq!(a.current_section(), Section::About);
     }
 
     #[test]
-    fn sections_view_arrows_cycle_sections() {
+    fn section_pane_arrows_cycle_sections() {
         let mut a = fresh();
         a.handle_key(KeyCode::Down);
         assert_eq!(a.selected_section_idx(), 1);
@@ -225,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn sections_view_jk_cycle_sections() {
+    fn section_pane_jk_cycle_sections() {
         let mut a = fresh();
         a.handle_key(KeyCode::Char('j'));
         assert_eq!(a.selected_section_idx(), 1);
@@ -234,90 +249,135 @@ mod tests {
     }
 
     #[test]
-    fn enter_in_sections_drills_to_items() {
+    fn section_navigation_resets_item_selection_to_zero() {
         let mut a = fresh();
+        a.item_list_state.select(Some(2));
         a.handle_key(KeyCode::Down);
-        let act = a.handle_key(KeyCode::Enter);
-        assert_eq!(act, Action::Drill);
-        assert!(matches!(a.view, View::Items { section_idx: 1 }));
+        assert_eq!(a.item_list_state.selected(), Some(0));
     }
 
     #[test]
-    fn right_arrow_in_sections_also_drills() {
+    fn enter_on_section_pane_shifts_focus_to_item_pane_without_drilling_to_detail() {
+        let mut a = fresh();
+        let act = a.handle_key(KeyCode::Enter);
+        assert_eq!(act, Action::Noop);
+        assert_eq!(a.view, View::Menu { pane: Pane::Item });
+    }
+
+    #[test]
+    fn right_arrow_on_section_pane_also_shifts_focus() {
         let mut a = fresh();
         let act = a.handle_key(KeyCode::Right);
-        assert_eq!(act, Action::Drill);
-        assert!(matches!(a.view, View::Items { section_idx: 0 }));
+        assert_eq!(act, Action::Noop);
+        assert_eq!(a.view, View::Menu { pane: Pane::Item });
     }
 
     #[test]
-    fn items_view_arrows_cycle_items() {
+    fn l_on_section_pane_also_shifts_focus() {
+        let mut a = fresh();
+        let act = a.handle_key(KeyCode::Char('l'));
+        assert_eq!(act, Action::Noop);
+        assert_eq!(a.view, View::Menu { pane: Pane::Item });
+    }
+
+    #[test]
+    fn item_pane_arrows_cycle_items_not_sections() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
+        let section_before = a.selected_section_idx();
         let count = crate::content::items_for(a.current_section()).len();
         if count >= 2 {
             a.handle_key(KeyCode::Down);
             assert_eq!(a.item_list_state.selected(), Some(1));
+            assert_eq!(a.selected_section_idx(), section_before);
         }
     }
 
     #[test]
-    fn enter_in_items_drills_to_detail() {
+    fn enter_on_item_pane_opens_detail() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
         let act = a.handle_key(KeyCode::Enter);
         assert_eq!(act, Action::Drill);
-        assert!(matches!(
+        assert_eq!(
             a.view,
             View::Detail {
                 section_idx: 0,
                 item_idx: 0
             }
-        ));
+        );
     }
 
     #[test]
-    fn backspace_from_items_returns_to_sections() {
+    fn right_on_item_pane_also_opens_detail() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Right);
+        assert_eq!(act, Action::Drill);
+        assert!(matches!(a.view, View::Detail { .. }));
+    }
+
+    #[test]
+    fn backspace_from_item_pane_returns_focus_to_section_pane() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
         let act = a.handle_key(KeyCode::Backspace);
         assert_eq!(act, Action::Back);
-        assert!(matches!(a.view, View::Sections));
+        assert_eq!(
+            a.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        );
     }
 
     #[test]
-    fn esc_from_items_returns_to_sections() {
+    fn esc_from_item_pane_returns_focus_to_section_pane() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
         let act = a.handle_key(KeyCode::Esc);
         assert_eq!(act, Action::Back);
-        assert!(matches!(a.view, View::Sections));
+        assert_eq!(
+            a.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        );
     }
 
     #[test]
-    fn h_from_items_returns_to_sections() {
+    fn h_from_item_pane_returns_focus_to_section_pane() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
         let act = a.handle_key(KeyCode::Char('h'));
         assert_eq!(act, Action::Back);
-        assert!(matches!(a.view, View::Sections));
+        assert_eq!(
+            a.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        );
     }
 
     #[test]
-    fn backspace_from_detail_returns_to_items() {
+    fn backspace_from_detail_returns_to_item_pane_preserving_selection() {
         let mut a = fresh();
         a.handle_key(KeyCode::Enter);
+        a.handle_key(KeyCode::Down);
+        let item_before = a.item_list_state.selected();
         a.handle_key(KeyCode::Enter);
+        assert!(matches!(a.view, View::Detail { .. }));
         let act = a.handle_key(KeyCode::Backspace);
         assert_eq!(act, Action::Back);
-        assert!(matches!(a.view, View::Items { section_idx: 0 }));
+        assert_eq!(a.view, View::Menu { pane: Pane::Item });
+        assert_eq!(a.item_list_state.selected(), item_before);
     }
 
     #[test]
     fn q_quits_from_any_view() {
         let mut a = fresh();
         assert_eq!(a.handle_key(KeyCode::Char('q')), Action::Quit);
-        a.view = View::Items { section_idx: 1 };
+        a.view = View::Menu { pane: Pane::Item };
         assert_eq!(a.handle_key(KeyCode::Char('q')), Action::Quit);
         a.view = View::Detail {
             section_idx: 1,
@@ -329,6 +389,8 @@ mod tests {
     #[test]
     fn i_returns_open_image_from_any_view() {
         let mut a = fresh();
+        assert_eq!(a.handle_key(KeyCode::Char('i')), Action::OpenImage);
+        a.view = View::Menu { pane: Pane::Item };
         assert_eq!(a.handle_key(KeyCode::Char('i')), Action::OpenImage);
         a.view = View::Detail {
             section_idx: 0,
@@ -368,5 +430,13 @@ mod tests {
         assert_eq!(a.current_section(), Section::Projects);
         a.handle_key(KeyCode::Enter);
         assert_eq!(a.current_section(), Section::Projects);
+    }
+
+    #[test]
+    fn current_item_returns_highlighted_item_on_section_pane() {
+        let a = fresh();
+        let item = a.current_item().expect("first about item exists");
+        let about_items = crate::content::items_for(Section::About);
+        assert_eq!(item.title, about_items[0].title);
     }
 }

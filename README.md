@@ -49,15 +49,17 @@ The binary needs a real TTY for raw mode + alternate screen. Plain shell prompts
 
 ## CONTROLS
 
-The TUI has three views: **SECTIONS** (the landing list), **ITEMS** (the list inside a section), and **DETAIL** (split pane — ASCII art left, markdown body right).
+The TUI has two views: **MENU** (split pane — sections list left, items-of-selected-section right) and **DETAIL** (split pane — ASCII art left, markdown body right).
 
-| Key                     | SECTIONS view            | ITEMS view             | DETAIL view                    |
-|-------------------------|--------------------------|------------------------|--------------------------------|
-| ↑ / ↓ / j / k           | Move section selection   | Move item selection    | (no-op)                        |
-| Enter / l / →           | Drill into section       | Open item detail       | (no-op)                        |
-| Backspace / h / ← / Esc | (no-op)                  | Back to SECTIONS       | Back to ITEMS                  |
-| **i**                   | Open `assets/hero.png`   | Open `assets/hero.png` | Open this item's PNG (or hero) |
-| q                       | Quit                     | Quit                   | Quit                           |
+In MENU view, both panes are always visible and the right pane updates live as you arrow through sections. Pane focus controls which list the arrow keys move and which list shows the `REVERSED` highlight; the unfocused list still shows its selection via the `> ` prefix.
+
+| Key                     | MENU (section pane focus)             | MENU (item pane focus)         | DETAIL view                    |
+|-------------------------|---------------------------------------|--------------------------------|--------------------------------|
+| ↑ / ↓ / j / k           | Move section sel; items refresh live  | Move item selection            | (no-op)                        |
+| Enter / → / l           | Shift focus → items pane              | Open item DETAIL               | (no-op)                        |
+| Backspace / h / ← / Esc | (no-op — top of nav stack)            | Shift focus → section pane     | Back to MENU (item pane focus) |
+| **i**                   | Open highlighted item's PNG (or hero) | Same                           | Same                           |
+| q                       | Quit                                  | Quit                           | Quit                           |
 
 The `i` dispatch uses the [`opener`](https://docs.rs/opener) crate, which handles:
 - **Linux / WSL**: `wslview` (when present) → Windows Photos; else `xdg-open` → your desktop file handler; else a built-in WSL fallback uses `wslpath -w` + `cmd.exe /c start`
@@ -131,15 +133,15 @@ This implementation extends the original brief in four intentional, additive way
 
 - **`j` / `k` / `l` / `h` navigation aliases** — vim-style alongside arrow keys. Both pairs map to the same logic.
 - **`i` opens the original image** in the OS-default viewer. Lets users see the full-resolution asset outside the terminal.
-- **Footer key-hint row** — the bottom row shows context-sensitive hints per view. The brief specified a 3-region root layout; the footer is added as a 4th fixed-height region for first-launch discoverability.
-- **Three-view drill-down** — Sections → Items → Detail. The brief specified static section content; this adds item-granularity with markdown bodies and per-item ASCII art.
+- **Footer key-hint row** — the bottom row shows context-sensitive hints per pane focus. The brief specified a 3-region root layout; the footer is added as a 4th fixed-height region for first-launch discoverability.
+- **Two-view menu UX** — single MENU view with focused-pane semantics (section nav left, items right, both always visible; right pane updates live on section navigation) plus DETAIL view. The brief specified static section content; this adds item-granularity with markdown bodies and per-item ASCII art while preserving a single-screen "menu with submenu" feel.
 
-`Esc` is context-sensitive: in SECTIONS view it is a no-op (`q` remains the only documented quit key, per the brief); in ITEMS and DETAIL views it acts as `Back`, alongside Backspace / h / ←.
+`Esc` is context-sensitive: in section-pane focus it is a no-op (`q` remains the only documented quit key, per the brief); in item-pane focus it shifts focus back to the section pane; in DETAIL view it returns to MENU (item pane focus). Alongside Backspace / h / ←.
 
 ## TESTING
 
 ```bash
-cargo test         # 42 unit + integration tests
+cargo test         # 49 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -150,7 +152,7 @@ cargo build --release
 ./tools/wave9_qa.sh
 ```
 
-The harness asserts: first-paint content, full drill-down navigation (Sections → Items → Detail → back → back), clean quit + restored terminal, TMUX-still-shows-ASCII, **CWD-independence** (hero renders even when run from a CWD with no `assets/` directory — locks in the compile-time embedding invariant), resize coherence at 80×24 and 160×50, zero color SGR codes in output, and `i`-key does not crash the TUI. Requires `tmux` on `PATH`.
+The harness asserts: first-paint content (including items shown immediately in the right pane — no drill needed), menu navigation with live right-pane refresh + focus shift + drill into DETAIL + back-stack unwind, clean quit + restored terminal, TMUX-still-shows-ASCII, **CWD-independence** (hero renders even when run from a CWD with no `assets/` directory — locks in the compile-time embedding invariant), resize coherence at 80×24 and 160×50, zero color SGR codes in output, and `i`-key does not crash the TUI. Requires `tmux` on `PATH`.
 
 ## LICENSE
 

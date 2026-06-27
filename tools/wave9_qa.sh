@@ -59,16 +59,16 @@ grep -q "MORISOBA"            "$QA/S1.txt" || { echo "  miss MORISOBA";   S1OK=0
 for w in "ABOUT" "PROJECTS" "EXPERIENCE" "CONTACT"; do
     grep -q "$w" "$QA/S1.txt" || { echo "  miss nav $w"; S1OK=0; }
 done
-grep -q "Q QUIT"              "$QA/S1.txt" || { echo "  miss Q QUIT";      S1OK=0; }
-grep -q "// HERO"             "$QA/S1.txt" || { echo "  miss // HERO";     S1OK=0; }
-grep -q "// NAV"              "$QA/S1.txt" || { echo "  miss // NAV";      S1OK=0; }
-grep -q "// CONTENT"          "$QA/S1.txt" || { echo "  miss // CONTENT";  S1OK=0; }
-grep -q "brutalist aesthetic" "$QA/S1.txt" || { echo "  miss About body";  S1OK=0; }
+grep -q "Q QUIT"              "$QA/S1.txt" || { echo "  miss Q QUIT";          S1OK=0; }
+grep -q "// HERO"             "$QA/S1.txt" || { echo "  miss // HERO";         S1OK=0; }
+grep -q "// NAV"              "$QA/S1.txt" || { echo "  miss // NAV";          S1OK=0; }
+grep -q "// ABOUT"            "$QA/S1.txt" || { echo "  miss // ABOUT title (right pane should show selected section title)"; S1OK=0; }
+grep -q "BIO"                 "$QA/S1.txt" || { echo "  miss BIO (first About item must be visible immediately, no drill)"; S1OK=0; }
 [ $S1OK -eq 1 ] && mark S1 PASS || mark S1 FAIL
 tmux -L S1 kill-server 2>/dev/null
 
-# ---------------- S2 navigation + drill-down + back ----------------
-echo "================ S2 navigation + drill-down ================"
+# ---------------- S2 menu navigation + focus shift + drill to detail ----------------
+echo "================ S2 menu navigation + focus shift + drill ================"
 tmux -L S2 kill-server 2>/dev/null
 tmux -L S2 new-session -d -s tui -x 120 -y 40
 tmux -L S2 send-keys -t tui "$BIN" Enter
@@ -79,7 +79,7 @@ tmux -L S2 send-keys -t tui Down ; sleep 0.4
 tmux -L S2 capture-pane -t tui -p > "$QA/S2_projects.txt"
 
 tmux -L S2 send-keys -t tui Enter ; sleep 0.4
-tmux -L S2 capture-pane -t tui -p > "$QA/S2_items.txt"
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_items_focus.txt"
 
 tmux -L S2 send-keys -t tui Down ; sleep 0.4
 tmux -L S2 capture-pane -t tui -p > "$QA/S2_items_d.txt"
@@ -94,17 +94,18 @@ tmux -L S2 send-keys -t tui BSpace ; sleep 0.4
 tmux -L S2 capture-pane -t tui -p > "$QA/S2_back2.txt"
 
 S2OK=1
-grep -q "brutalist aesthetic" "$QA/S2_init.txt"     || { echo "  init: miss About preamble";          S2OK=0; }
-grep -q "Selected projects"   "$QA/S2_projects.txt" || { echo "  +Down: miss Projects preamble";      S2OK=0; }
-grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_items.txt" || { echo "  drill: miss DLE in item list";       S2OK=0; }
-grep -q "TUI FRAMEWORK"       "$QA/S2_items.txt"    || { echo "  drill: miss TUI FW in item list";    S2OK=0; }
-grep -q "KERNEL TRACE"        "$QA/S2_items.txt"    || { echo "  drill: miss KTT in item list";       S2OK=0; }
-grep -q "BACK"                "$QA/S2_items.txt"    || { echo "  drill: footer missing BACK hint";    S2OK=0; }
-grep -q "TUI FRAMEWORK"       "$QA/S2_detail.txt"   || { echo "  detail: miss item title";            S2OK=0; }
-grep -q "BACK"                "$QA/S2_detail.txt"   || { echo "  detail: footer missing BACK hint";   S2OK=0; }
-grep -q "// NAV"              "$QA/S2_detail.txt"   && { echo "  detail: NAV should NOT be visible";  S2OK=0; }
-grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_back1.txt" || { echo "  back1: should be Items view";        S2OK=0; }
-grep -q "Selected projects"   "$QA/S2_back2.txt"    || { echo "  back2: should be Sections view";    S2OK=0; }
+grep -q "BIO"                    "$QA/S2_init.txt"        || { echo "  init: About items not shown immediately (need BIO)";          S2OK=0; }
+grep -q "// PROJECTS"            "$QA/S2_projects.txt"    || { echo "  +Down: right pane title not updated to // PROJECTS";          S2OK=0; }
+grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_projects.txt"    || { echo "  +Down: Projects items not visible LIVE (no drill needed)";    S2OK=0; }
+grep -q "BACK"                   "$QA/S2_items_focus.txt" || { echo "  Enter (focus shift): footer should now show BACK hint";       S2OK=0; }
+grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_items_focus.txt" || { echo "  Enter (focus shift): items pane should still show Projects"; S2OK=0; }
+grep -q "TUI FRAMEWORK"          "$QA/S2_detail.txt"      || { echo "  detail: miss TUI FRAMEWORK title";                            S2OK=0; }
+grep -q "BACK"                   "$QA/S2_detail.txt"      || { echo "  detail: footer missing BACK hint";                            S2OK=0; }
+grep -q "// NAV"                 "$QA/S2_detail.txt"      && { echo "  detail: // NAV should NOT be visible in detail view";        S2OK=0; }
+grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_back1.txt"       || { echo "  back1: should return to items pane with Projects visible";    S2OK=0; }
+grep -q "BACK"                   "$QA/S2_back1.txt"       || { echo "  back1: footer should still show BACK (item pane focused)";    S2OK=0; }
+grep -q "// PROJECTS"            "$QA/S2_back2.txt"       || { echo "  back2: should still show // PROJECTS (section preserved)";    S2OK=0; }
+grep -q "BACK"                   "$QA/S2_back2.txt"       && { echo "  back2: footer should NOT show BACK (top of nav stack)";       S2OK=0; }
 [ $S2OK -eq 1 ] && mark S2 PASS || mark S2 FAIL
 tmux -L S2 kill-server 2>/dev/null
 
