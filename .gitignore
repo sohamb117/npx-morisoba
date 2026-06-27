@@ -17,5 +17,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# npm wrapper local state
+npm/node_modules/
+npm/*.tgz
+npm/.cache/
+
 # OpenCode loop state and research notes - not project artifacts
 .omo/

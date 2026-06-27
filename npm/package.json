@@ -1,0 +1,44 @@
+{
+  "name": "morisoba",
+  "version": "0.1.0",
+  "description": "Black-and-white brutalist portfolio TUI. Run with `npx morisoba`.",
+  "license": "MIT OR Apache-2.0",
+  "author": "MORISOBA",
+  "homepage": "https://github.com/morisoba/morisoba",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/morisoba/morisoba.git"
+  },
+  "bugs": {
+    "url": "https://github.com/morisoba/morisoba/issues"
+  },
+  "keywords": [
+    "tui",
+    "portfolio",
+    "brutalist",
+    "morisoba",
+    "ratatui",
+    "ascii-art",
+    "rust"
+  ],
+  "bin": {
+    "morisoba": "./bin/morisoba.js"
+  },
+  "files": [
+    "bin/",
+    "assets/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
