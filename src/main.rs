@@ -74,11 +74,7 @@ fn run_loop(terminal: &mut Term, app: &mut App, hero_ascii: Option<&Text<'_>>) -
                     match app.handle_key(key.code) {
                         Action::Quit => break,
                         Action::OpenImage => {
-                            let bytes = app
-                                .current_item()
-                                .and_then(|i| i.png_bytes)
-                                .or(content::HERO_PNG);
-                            if let Some(bytes) = bytes {
+                            if let Some(bytes) = app.image_to_open() {
                                 let _ = open_image_bytes(bytes);
                             }
                         }

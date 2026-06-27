@@ -105,6 +105,24 @@ impl App {
         items.get(item_idx)
     }
 
+    /// PNG bytes to feed the `i` key. On section-pane focus there is no
+    /// specific item context, so we return the landing hero. On every other
+    /// view the highlighted/viewed item must have its OWN PNG — no hero
+    /// fallback. This avoids the trap where every page appears to show the
+    /// same image just because the user has not authored per-item art yet.
+    pub fn image_to_open(&self) -> Option<&'static [u8]> {
+        if matches!(
+            self.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        ) {
+            crate::content::HERO_PNG
+        } else {
+            self.current_item().and_then(|i| i.png_bytes)
+        }
+    }
+
     pub fn handle_key(&mut self, code: KeyCode) -> Action {
         match code {
             KeyCode::Char('q') => return Action::Quit,
@@ -438,5 +456,55 @@ mod tests {
         let item = a.current_item().expect("first about item exists");
         let about_items = crate::content::items_for(Section::About);
         assert_eq!(item.title, about_items[0].title);
+    }
+
+    #[test]
+    fn image_to_open_in_section_pane_focus_returns_hero_png() {
+        let a = fresh();
+        assert_eq!(
+            a.view,
+            View::Menu {
+                pane: Pane::Section
+            }
+        );
+        assert_eq!(a.image_to_open(), crate::content::HERO_PNG);
+    }
+
+    #[test]
+    fn image_to_open_in_item_pane_focus_returns_highlighted_items_png_bytes() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        assert_eq!(a.view, View::Menu { pane: Pane::Item });
+        let first_about = &crate::content::items_for(Section::About)[0];
+        assert_eq!(a.image_to_open(), first_about.png_bytes);
+    }
+
+    #[test]
+    fn image_to_open_in_detail_view_returns_viewed_items_png_bytes() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        a.handle_key(KeyCode::Enter);
+        assert!(matches!(a.view, View::Detail { .. }));
+        let first_about = &crate::content::items_for(Section::About)[0];
+        assert_eq!(a.image_to_open(), first_about.png_bytes);
+    }
+
+    #[test]
+    fn image_to_open_does_not_fall_back_to_hero_for_item_without_png() {
+        let mut a = fresh();
+        for _ in 0..3 {
+            a.handle_key(KeyCode::Down);
+        }
+        a.handle_key(KeyCode::Enter);
+        assert_eq!(a.current_section(), Section::Contact);
+        let first_contact = &crate::content::items_for(Section::Contact)[0];
+        assert!(
+            first_contact.png_bytes.is_none(),
+            "test fixture assumption: contact items have no PNG sibling"
+        );
+        assert!(
+            a.image_to_open().is_none(),
+            "must NOT fall back to HERO_PNG on item-pane focus"
+        );
     }
 }
