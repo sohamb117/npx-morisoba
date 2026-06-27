@@ -11,23 +11,23 @@ use crossterm::terminal::{
 };
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::io::{self, Stdout};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
-const HERO_PATH: &str = "assets/hero.png";
-
 fn main() -> io::Result<()> {
     install_panic_hook();
 
-    let hero_path = Path::new(HERO_PATH);
-    let hero_ascii: Option<String> = renderer::ascii::load_and_render(hero_path, 60, 8);
+    let hero_ascii: Option<String> = content::HERO_PNG
+        .and_then(|bytes| renderer::ascii::load_and_render_bytes(bytes, 60, 8));
 
     let mut terminal = init_terminal()?;
     let mut app = App::new();
-    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_deref(), hero_path);
+    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_deref());
     let _ = restore_terminal();
     result
 }
@@ -62,12 +62,7 @@ fn install_panic_hook() {
     }));
 }
 
-fn run_loop(
-    terminal: &mut Term,
-    app: &mut App,
-    hero_ascii: Option<&str>,
-    hero_path: &Path,
-) -> io::Result<()> {
+fn run_loop(terminal: &mut Term, app: &mut App, hero_ascii: Option<&str>) -> io::Result<()> {
     loop {
         terminal.draw(|frame| ui::render(frame, app, hero_ascii))?;
 
@@ -77,12 +72,13 @@ fn run_loop(
                     match app.handle_key(key.code) {
                         Action::Quit => break,
                         Action::OpenImage => {
-                            let target = app
+                            let bytes = app
                                 .current_item()
-                                .and_then(|i| i.png_path)
-                                .map(Path::new)
-                                .unwrap_or(hero_path);
-                            let _ = open_image(target);
+                                .and_then(|i| i.png_bytes)
+                                .or(content::HERO_PNG);
+                            if let Some(bytes) = bytes {
+                                let _ = open_image_bytes(bytes);
+                            }
                         }
                         Action::Drill | Action::Back | Action::Noop => {}
                     }
@@ -93,14 +89,15 @@ fn run_loop(
     Ok(())
 }
 
-fn open_image(path: &Path) -> io::Result<()> {
-    if opener::open(path).is_ok() {
+fn open_image_bytes(bytes: &[u8]) -> io::Result<()> {
+    let path = materialize_temp_png(bytes)?;
+    if opener::open(&path).is_ok() {
         return Ok(());
     }
     if is_wsl() {
         if let Ok(output) = std::process::Command::new("wslpath")
             .arg("-w")
-            .arg(path)
+            .arg(&path)
             .output()
         {
             if output.status.success() {
@@ -116,6 +113,21 @@ fn open_image(path: &Path) -> io::Result<()> {
         }
     }
     Err(io::Error::other("no image opener available"))
+}
+
+/// Hash the bytes with DefaultHasher to derive a stable per-asset filename,
+/// then write them to `$TMPDIR/morisoba-<hex>.png` if not already present.
+/// The temp file persists across runs and is reused when the same asset
+/// is opened repeatedly. Returns the temp file path.
+fn materialize_temp_png(bytes: &[u8]) -> io::Result<PathBuf> {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    let h = hasher.finish();
+    let path = std::env::temp_dir().join(format!("morisoba-{:016x}.png", h));
+    if !Path::new(&path).exists() {
+        std::fs::write(&path, bytes)?;
+    }
+    Ok(path)
 }
 
 fn is_wsl() -> bool {

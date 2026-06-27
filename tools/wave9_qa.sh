@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Wave 9 scenario verification harness for the SSH Profile TUI.
+# Wave 9 scenario verification harness for the morisoba portfolio TUI.
 #
-# Reproduces the seven manual scenarios (S1..S7) that gate "done" on this project:
-#   S1 first-paint, S2 navigation, S3 clean-quit,
-#   S4 TMUX -> Ascii, S5 missing hero, S6 resize, S7 zero-color SGR.
+# Reproduces the eight manual scenarios (S1..S8) that gate "done" on this project:
+#   S1 first-paint, S2 navigation + drill-down, S3 clean-quit,
+#   S4 TMUX -> Ascii, S5 CWD-independence (hero must render from any CWD),
+#   S6 resize, S7 zero-color SGR, S8 'i'-key smoke.
 #
 # Each scenario runs inside its own tmux socket (-L S1, -L S2, ...) so they cannot
 # collide. Captured artifacts are written under $QA for human inspection.
@@ -140,28 +141,24 @@ grep -Pq '\x1b\]1337;File='    "$QA/S4.ansi" && { echo "  iTerm inline image esc
 [ $S4OK -eq 1 ] && mark S4 PASS || mark S4 FAIL
 tmux -L S4 kill-server 2>/dev/null
 
-# ---------------- S5 missing hero ----------------
-echo "================ S5 missing hero ================"
-HERO_BACKUP=""
-if [ -f "$WORKDIR/assets/hero.png" ]; then
-    HERO_BACKUP="/tmp/hero_backup_$$.png"
-    mv "$WORKDIR/assets/hero.png" "$HERO_BACKUP"
-fi
+# ---------------- S5 CWD-independence (hero embedded at compile time) ----------------
+echo "================ S5 CWD-independence ================"
+# Hero bytes are include_bytes!'d at compile time, so the binary must render
+# the ASCII hero regardless of the runtime CWD. Run from /tmp (no assets/)
+# and assert the [ HERO ] placeholder is NEVER shown.
 tmux -L S5 kill-server 2>/dev/null
-tmux -L S5 new-session -d -s tui -x 120 -y 40
+tmux -L S5 new-session -d -s tui -x 120 -y 40 -c /tmp
 tmux -L S5 send-keys -t tui "$BIN" Enter
 sleep 1.0
 tmux -L S5 capture-pane -t tui -p > "$QA/S5.txt"
 S5OK=1
-grep -q "\[ HERO \]" "$QA/S5.txt" || { echo "  no placeholder text"; S5OK=0; }
-grep -q "// HERO"    "$QA/S5.txt" || { echo "  hero border missing"; S5OK=0; }
+grep -q "// HERO"     "$QA/S5.txt" || { echo "  hero border missing";                    S5OK=0; }
+grep -q "MORISOBA"    "$QA/S5.txt" || { echo "  header missing (TUI may not have launched)"; S5OK=0; }
+grep -q "\[ HERO \]"  "$QA/S5.txt" && { echo "  placeholder visible — hero failed to embed";  S5OK=0; }
 ALIVE=$(tmux -L S5 list-panes -t tui -F '#{pane_dead}' 2>/dev/null)
 [ "$ALIVE" = "0" ] || { echo "  pane reports dead (pane_dead=$ALIVE)"; S5OK=0; }
 [ $S5OK -eq 1 ] && mark S5 PASS || mark S5 FAIL
 tmux -L S5 kill-server 2>/dev/null
-if [ -n "$HERO_BACKUP" ] && [ -f "$HERO_BACKUP" ]; then
-    mv "$HERO_BACKUP" "$WORKDIR/assets/hero.png"
-fi
 
 # ---------------- S6 resize ----------------
 echo "================ S6 resize ================"

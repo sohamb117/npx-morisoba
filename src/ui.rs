@@ -157,8 +157,9 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
         let [left, right] = split_detail_halves(content);
 
         let ascii_text = item
-            .png_path
-            .and_then(|p| crate::renderer::ascii::load_and_render(std::path::Path::new(p), 36, 14))
+            .png_bytes
+            .or(crate::content::HERO_PNG)
+            .and_then(|b| crate::renderer::ascii::load_and_render_bytes(b, 36, 14))
             .unwrap_or_else(|| "[ NO IMAGE ]".to_string());
         let ascii_widget = Paragraph::new(ascii_text)
             .block(Block::bordered().title("// IMAGE"))

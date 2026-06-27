@@ -1,6 +1,7 @@
-//! ASCII art renderer. Pure pixel→character mapping plus a graceful file loader.
-
-use std::path::Path;
+//! ASCII art renderer. Pure pixel→character mapping plus an in-memory loader.
+//!
+//! All asset bytes are embedded at compile time via [`crate::content`]; this
+//! module never touches the filesystem at runtime.
 
 /// Brutalist 10-step luminance ramp: space = blackest, '@' = whitest.
 pub const RAMP: [char; 10] = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
@@ -26,15 +27,19 @@ pub fn pixels_to_ascii(luma: &[u8], w: u32, h: u32) -> String {
     out
 }
 
-pub fn load_and_render(path: &Path, max_w: u32, max_h: u32) -> Option<String> {
-    const MAX_BYTES: u64 = 10 * 1024 * 1024;
+/// Decode embedded PNG/JPEG bytes and render to an ASCII grid at most
+/// `max_w` columns wide × `max_h` rows tall. Returns `None` on any decode
+/// failure (corrupt bytes, exceeded limits) — never panics.
+pub fn load_and_render_bytes(bytes: &[u8], max_w: u32, max_h: u32) -> Option<String> {
+    const MAX_BYTES: usize = 10 * 1024 * 1024;
     const MAX_DIM: u32 = 2048;
 
-    let meta = std::fs::metadata(path).ok()?;
-    if meta.len() > MAX_BYTES {
+    if bytes.len() > MAX_BYTES {
         return None;
     }
-    let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_DIM);
     limits.max_image_height = Some(MAX_DIM);
@@ -50,7 +55,6 @@ pub fn load_and_render(path: &Path, max_w: u32, max_h: u32) -> Option<String> {
     Some(pixels_to_ascii(gray.as_raw(), w, h))
 }
 
-// T06 (Wave 2) - RED tests for the pure ramp mapping and graceful loader.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,7 +71,6 @@ mod tests {
 
     #[test]
     fn all_zero_pixels_map_to_space() {
-        // 4x4 grid -> step_by(2) -> 2 rows of 4 cells
         let buf = [0u8; 16];
         let out = pixels_to_ascii(&buf, 4, 4);
         for line in out.lines() {
@@ -92,7 +95,6 @@ mod tests {
 
     #[test]
     fn mid_grey_maps_to_middle_of_ramp() {
-        // 128 / 256 * 10 = 5 -> RAMP[5] = '+'
         let buf = [128u8; 4];
         let out = pixels_to_ascii(&buf, 2, 2);
         for line in out.lines() {
@@ -105,7 +107,6 @@ mod tests {
 
     #[test]
     fn output_height_is_input_height_div_two_due_to_step_by_2() {
-        // 4 wide x 10 tall -> 5 rows in ASCII
         let buf = [0u8; 40];
         let out = pixels_to_ascii(&buf, 4, 10);
         assert_eq!(out.lines().count(), 5);
@@ -113,7 +114,6 @@ mod tests {
 
     #[test]
     fn output_width_equals_input_width() {
-        // 6 wide x 2 tall -> 1 row of 6 chars
         let buf = [0u8; 12];
         let out = pixels_to_ascii(&buf, 6, 2);
         let lines: Vec<&str> = out.lines().collect();
@@ -124,11 +124,22 @@ mod tests {
     }
 
     #[test]
-    fn load_missing_file_returns_none() {
-        let p = Path::new("/this/path/does/not/exist/__no_hero__.png");
+    fn load_garbage_bytes_returns_none() {
+        let bytes = b"not a valid png or jpeg payload";
         assert!(
-            load_and_render(p, 10, 10).is_none(),
-            "missing file must NOT panic and MUST return None"
+            load_and_render_bytes(bytes, 10, 10).is_none(),
+            "garbage bytes must NOT panic and MUST return None"
         );
+    }
+
+    #[test]
+    fn load_empty_bytes_returns_none() {
+        assert!(load_and_render_bytes(&[], 10, 10).is_none());
+    }
+
+    #[test]
+    fn load_oversize_bytes_returns_none() {
+        let huge = vec![0u8; 11 * 1024 * 1024];
+        assert!(load_and_render_bytes(&huge, 10, 10).is_none());
     }
 }
