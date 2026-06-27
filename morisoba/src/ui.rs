@@ -8,7 +8,7 @@
 
 use crate::app::{App, Pane, View};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
@@ -79,7 +79,9 @@ fn render_header(frame: &mut Frame, area: Rect) {
 
 fn focus_style(focused: bool) -> Style {
     if focused {
-        Style::default().add_modifier(Modifier::REVERSED)
+        Style::default()
+            .fg(Color::Indexed(232))
+            .bg(Color::Indexed(255))
     } else {
         Style::default()
     }
@@ -109,16 +111,11 @@ fn render_item_pane(frame: &mut Frame, area: Rect, app: &mut App, focused: bool)
     frame.render_stateful_widget(widget, area, &mut app.item_list_state);
 }
 
-fn render_footer(frame: &mut Frame, area: Rect, view: View, has_image: bool) {
-    let image_hint = if has_image { "  I IMAGE" } else { "" };
-    let text = match view {
-        View::Menu {
-            pane: Pane::Section,
-        } => format!("UP/DN NAV  ENTER/RIGHT ITEMS{}  Q QUIT", image_hint),
-        View::Menu { pane: Pane::Item } => {
-            format!("UP/DN NAV  ENTER OPEN  BKSP/LEFT BACK{}  Q QUIT", image_hint)
-        }
-        View::Detail { .. } => format!("BKSP/ESC BACK{}  Q QUIT", image_hint),
+fn render_footer(frame: &mut Frame, area: Rect, _view: View, has_image: bool) {
+    let text = if has_image {
+        "arrows to navigate    I for image"
+    } else {
+        "arrows to navigate"
     };
     frame.render_widget(Paragraph::new(text).alignment(Alignment::Left), area);
 }
@@ -174,7 +171,6 @@ fn render_detail_view(
     render_footer(frame, footer, app.view, has_image);
 }
 
-#[allow(unused_variables)]
 pub(crate) fn pick_detail_ascii(
     item: &crate::content::Item,
     max_w: u32,
@@ -183,7 +179,6 @@ pub(crate) fn pick_detail_ascii(
     if let Some(art) = item.ascii {
         return Some(Text::raw(art));
     }
-    #[cfg(not(target_arch = "wasm32"))]
     if let Some(b) = item.png_bytes {
         return crate::renderer::ascii::load_and_render_bytes(b, max_w, max_h);
     }
@@ -196,7 +191,7 @@ mod tests {
     use crate::app::Section;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
-    use ratatui::style::{Color, Modifier};
+    use ratatui::style::Color;
     use ratatui::Terminal;
 
     fn render_view(width: u16, height: u16, app: &mut App, hero: Option<&Text<'_>>) -> Buffer {
@@ -237,53 +232,53 @@ mod tests {
     }
 
     #[test]
-    fn menu_view_footer_has_quit_hint() {
+    fn menu_view_footer_shows_navigate_hint() {
         let mut a = App::new();
         let buf = render_view(120, 40, &mut a, None);
-        assert!(buffer_contains(&buf, "Q QUIT"));
+        assert!(buffer_contains(&buf, "arrows to navigate"));
     }
 
     #[test]
-    fn menu_view_footer_has_image_hint() {
+    fn menu_view_footer_shows_image_hint_when_image_available() {
         let mut a = App::new();
         let buf = render_view(120, 40, &mut a, None);
-        assert!(buffer_contains(&buf, "I IMAGE"));
+        assert!(buffer_contains(&buf, "I for image"));
     }
 
     #[test]
-    fn menu_view_no_foreground_color() {
+    fn menu_view_no_chromatic_foreground() {
         let mut a = App::new();
         let buf = render_view(120, 40, &mut a, None);
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
-                assert_eq!(
-                    buf[(x, y)].fg,
-                    Color::Reset,
-                    "cell ({x},{y}) has fg {:?}",
-                    buf[(x, y)].fg
+                let fg = buf[(x, y)].fg;
+                assert!(
+                    matches!(fg, Color::Reset | Color::Indexed(232..=255)),
+                    "cell ({x},{y}) has chromatic fg {:?}",
+                    fg
                 );
             }
         }
     }
 
     #[test]
-    fn menu_view_no_background_color() {
+    fn menu_view_no_chromatic_background() {
         let mut a = App::new();
         let buf = render_view(120, 40, &mut a, None);
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
-                assert_eq!(
-                    buf[(x, y)].bg,
-                    Color::Reset,
-                    "cell ({x},{y}) has bg {:?}",
-                    buf[(x, y)].bg
+                let bg = buf[(x, y)].bg;
+                assert!(
+                    matches!(bg, Color::Reset | Color::Indexed(232..=255)),
+                    "cell ({x},{y}) has chromatic bg {:?}",
+                    bg
                 );
             }
         }
     }
 
     #[test]
-    fn menu_view_section_pane_focused_about_row_has_reversed_modifier() {
+    fn menu_view_section_pane_focused_about_row_has_highlight_style() {
         let mut a = App::new();
         let buf = render_view(120, 40, &mut a, None);
         let mut found = false;
@@ -292,12 +287,17 @@ mod tests {
             if !line.contains("ABOUT") {
                 continue;
             }
-            if (0..buf.area.width).any(|x| buf[(x, y)].modifier.contains(Modifier::REVERSED)) {
+            if (0..buf.area.width).any(|x| {
+                buf[(x, y)].fg == Color::Indexed(232) && buf[(x, y)].bg == Color::Indexed(255)
+            }) {
                 found = true;
                 break;
             }
         }
-        assert!(found, "focused section row (ABOUT) should be REVERSED");
+        assert!(
+            found,
+            "focused section row (ABOUT) should have black-on-white highlight"
+        );
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn menu_view_item_pane_focused_first_item_has_reversed_modifier() {
+    fn menu_view_item_pane_focused_first_item_has_highlight_style() {
         let mut a = App::new();
         a.handle_key(crossterm::event::KeyCode::Enter);
         let buf = render_view(120, 40, &mut a, None);
@@ -356,33 +356,25 @@ mod tests {
             if !line.contains(needle) {
                 continue;
             }
-            if (0..buf.area.width).any(|x| buf[(x, y)].modifier.contains(Modifier::REVERSED)) {
+            if (0..buf.area.width).any(|x| {
+                buf[(x, y)].fg == Color::Indexed(232) && buf[(x, y)].bg == Color::Indexed(255)
+            }) {
                 found = true;
                 break;
             }
         }
         assert!(
             found,
-            "after focus shift to item pane, first item row should be REVERSED"
+            "after focus shift to item pane, first item row should have black-on-white highlight"
         );
     }
 
     #[test]
-    fn menu_view_item_pane_focus_footer_has_back_hint() {
+    fn menu_view_item_pane_focus_footer_shows_navigate_hint() {
         let mut a = App::new();
         a.handle_key(crossterm::event::KeyCode::Enter);
         let buf = render_view(120, 40, &mut a, None);
-        assert!(buffer_contains(&buf, "BACK"));
-    }
-
-    #[test]
-    fn menu_view_section_pane_focus_footer_has_no_back_hint() {
-        let mut a = App::new();
-        let buf = render_view(120, 40, &mut a, None);
-        assert!(
-            !buffer_contains(&buf, "BACK"),
-            "section pane footer should not advertise BACK (top of nav stack)"
-        );
+        assert!(buffer_contains(&buf, "arrows to navigate"));
     }
 
     #[test]
@@ -420,14 +412,14 @@ mod tests {
     }
 
     #[test]
-    fn detail_view_footer_has_back_hint() {
+    fn detail_view_footer_shows_navigate_hint() {
         let mut a = App::new();
         a.view = View::Detail {
             section_idx: 0,
             item_idx: 0,
         };
         let buf = render_view(120, 40, &mut a, None);
-        assert!(buffer_contains(&buf, "BACK"));
+        assert!(buffer_contains(&buf, "arrows to navigate"));
     }
 
     #[test]
@@ -497,8 +489,8 @@ mod tests {
         };
         let buf = render_view(120, 40, &mut a, None);
         assert!(
-            !buffer_contains(&buf, "I IMAGE"),
-            "footer must hide I IMAGE hint when current item has no PNG"
+            !buffer_contains(&buf, "I for image"),
+            "footer must hide image hint when current item has no PNG"
         );
     }
 }

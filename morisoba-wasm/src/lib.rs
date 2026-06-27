@@ -6,7 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use morisoba::app::{Action, App};
-use morisoba::ui;
+use morisoba::{content, renderer::ascii, ui};
+use ratatui::text::Text;
 use ratatui::Terminal;
 use ratzilla::event::{KeyCode as ZKeyCode, KeyEvent as ZKeyEvent};
 use ratzilla::{DomBackend, WebRenderer};
@@ -32,6 +33,10 @@ pub fn start() -> Result<(), JsValue> {
         .and_then(|w| w.performance())
         .map(|p| p.now())
         .unwrap_or(0.0);
+
+    let hero_ascii: Option<Text<'static>> = content::HERO_ASCII.map(Text::raw).or_else(|| {
+        content::HERO_PNG.and_then(|bytes| ascii::load_and_render_bytes(bytes, 60, 8))
+    });
 
     let app_for_keys = app.clone();
     terminal
@@ -69,7 +74,7 @@ pub fn start() -> Result<(), JsValue> {
             .unwrap_or(0.0);
         let tick_ms = (now - start_ms).max(0.0) as u64;
         let mut a = app_for_draw.borrow_mut();
-        ui::render(f, &mut a, None, tick_ms);
+        ui::render(f, &mut a, hero_ascii.as_ref(), tick_ms);
     });
 
     Ok(())

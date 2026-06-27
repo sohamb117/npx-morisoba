@@ -28,28 +28,48 @@
   function attachDrag(win, handle) {
     let dragging = false;
     let startX = 0, startY = 0, startLeft = 0, startTop = 0;
-    handle.addEventListener("mousedown", function (e) {
-      // Ignore clicks on the close button — let it fire its own handler
-      if (e.target && e.target.classList && e.target.classList.contains("desktop-close")) return;
+
+    function startDrag(clientX, clientY, target) {
+      if (target && target.classList && target.classList.contains("desktop-close")) return false;
       dragging = true;
       const rect = win.getBoundingClientRect();
-      startX = e.clientX;
-      startY = e.clientY;
+      startX = clientX;
+      startY = clientY;
       startLeft = rect.left;
       startTop = rect.top;
       bumpZ(win);
-      e.preventDefault();
+      return true;
+    }
+
+    function moveDrag(clientX, clientY) {
+      if (!dragging) return;
+      win.style.left = (startLeft + clientX - startX) + "px";
+      win.style.top = (startTop + clientY - startY) + "px";
+    }
+
+    function endDrag() { dragging = false; }
+
+    handle.addEventListener("mousedown", function (e) {
+      if (startDrag(e.clientX, e.clientY, e.target)) e.preventDefault();
     });
     document.addEventListener("mousemove", function (e) {
-      if (!dragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      win.style.left = (startLeft + dx) + "px";
-      win.style.top = (startTop + dy) + "px";
+      moveDrag(e.clientX, e.clientY);
     });
-    document.addEventListener("mouseup", function () {
-      dragging = false;
-    });
+    document.addEventListener("mouseup", endDrag);
+
+    handle.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (startDrag(t.clientX, t.clientY, e.target)) e.preventDefault();
+    }, { passive: false });
+    document.addEventListener("touchmove", function (e) {
+      if (!dragging || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      moveDrag(t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    document.addEventListener("touchend", endDrag);
+    document.addEventListener("touchcancel", endDrag);
   }
 
   function attachFocus(win) {
@@ -78,6 +98,62 @@
     const div = document.createElement("div");
     div.textContent = String(s);
     return div.innerHTML;
+  }
+
+  function attachResize(win, handle, onEnd) {
+    let resizing = false;
+    let startX = 0, startY = 0, startW = 0, startH = 0;
+    const MIN_W = 200, MIN_H = 120;
+
+    function startResize(clientX, clientY) {
+      resizing = true;
+      const rect = win.getBoundingClientRect();
+      startX = clientX;
+      startY = clientY;
+      startW = rect.width;
+      startH = rect.height;
+      bumpZ(win);
+    }
+
+    function moveResize(clientX, clientY) {
+      if (!resizing) return;
+      win.style.width = Math.max(MIN_W, startW + clientX - startX) + "px";
+      win.style.height = Math.max(MIN_H, startH + clientY - startY) + "px";
+    }
+
+    function endResize() {
+      if (!resizing) return;
+      resizing = false;
+      if (onEnd && (win.offsetWidth !== startW || win.offsetHeight !== startH)) {
+        onEnd(win);
+      }
+    }
+
+    handle.addEventListener("mousedown", function (e) {
+      startResize(e.clientX, e.clientY);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener("mousemove", function (e) {
+      moveResize(e.clientX, e.clientY);
+    });
+    document.addEventListener("mouseup", endResize);
+
+    handle.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      startResize(t.clientX, t.clientY);
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+    document.addEventListener("touchmove", function (e) {
+      if (!resizing || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      moveResize(t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    document.addEventListener("touchend", endResize);
+    document.addEventListener("touchcancel", endResize);
   }
 
   function spawn_image(bytes, slug) {
@@ -126,15 +202,20 @@
     body.appendChild(img);
     win.appendChild(titlebar);
     win.appendChild(body);
+
+    const resizeHandle = document.createElement("div");
+    resizeHandle.className = "desktop-resize-handle";
+    win.appendChild(resizeHandle);
+
     root.appendChild(win);
 
     attachDrag(win, titlebar);
     attachFocus(win);
     attachClose(win, closeBtn);
+    attachResize(win, resizeHandle);
   }
 
   ready(function () {
-    // Attach drag + focus to the initial terminal window so it can also be moved.
     const terminal = document.querySelector('.desktop-window[data-window-id="terminal"]');
     if (terminal) {
       const titlebar = terminal.querySelector(".desktop-titlebar");
@@ -142,6 +223,12 @@
       attachFocus(terminal);
       bumpZ(terminal);
     }
+
+    let resizeTimer;
+    window.addEventListener("resize", function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () { window.location.reload(); }, 200);
+    });
   });
 
   // Expose to wasm-bindgen

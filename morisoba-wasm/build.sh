@@ -26,7 +26,11 @@ if [ ! -x "$WASM_BINDGEN" ]; then
 fi
 
 DIST="${HERE}/dist"
-rm -rf "$DIST"
+# Dev servers (python -m http.server) hold the dir handle on Windows mounts,
+# making `rm -rf <dir>` fail. Removing contents in-place works regardless.
+if ! rm -rf "$DIST" 2>/dev/null; then
+    rm -rf "$DIST"/* "$DIST"/.[!.]* 2>/dev/null || true
+fi
 mkdir -p "$DIST"
 
 echo "[1/4] cargo build --target wasm32-unknown-unknown -p morisoba-wasm --release"
