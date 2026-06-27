@@ -135,7 +135,7 @@ fn worms(slug: &str, w: u16, h: u16, t: f64) -> Text<'static> {
     let w_i = w as i32;
     let h_i = h as i32;
     for i in 0..n_worms {
-        let s = seed.wrapping_add(i as u64 * 0x9E37_79B9_7F4A_7C15);
+        let s = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let trail_len = 12 + (s % 10) as usize;
         let speed_x = 0.3 + (s % 100) as f64 / 200.0;
         let speed_y = 0.4 + ((s / 100) % 100) as f64 / 200.0;
@@ -174,7 +174,7 @@ fn cellular(slug: &str, w: u16, h: u16, t: f64) -> Text<'static> {
     let h_f = (h as f64).max(1.0);
     let centers: Vec<(f64, f64)> = (0..n_centers)
         .map(|i| {
-            let s = seed.wrapping_add(i as u64 * 0xBF58_476D_1CE4_E5B9);
+            let s = seed.wrapping_add((i as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9));
             let cx = (s % 1000) as f64 / 1000.0 * w_f;
             let cy = ((s / 1000) % 1000) as f64 / 1000.0 * h_f;
             let phase_x = ((s / 100) % 1000) as f64 / 100.0;
