@@ -53,7 +53,12 @@ The TUI is designed to be the entry point for an SSH session.
 
 ### Method A: authorized_keys ForceCommand (Recommended)
 
-Add the following to your `~/.ssh/authorized_keys` file. The client must request a PTY (`ssh -t`) or the server must be configured with `RequestTTY force`.
+Add the following to your `~/.ssh/authorized_keys` file. A PTY is required because `enable_raw_mode()` fails on a non-TTY stdin. Allocate one from EITHER side:
+
+- **client side** — invoke as `ssh -t user@host`, or add `RequestTTY force` to your `~/.ssh/config`
+- **server side** — keep `PermitTTY yes` in `/etc/ssh/sshd_config` (this is the OpenSSH default)
+
+(`RequestTTY` is a *client* ssh_config option; the matching *server* setting is `PermitTTY`. Both layers must allow a TTY for the TUI to start.)
 
 ```
 command="/usr/local/bin/ssh-profile-tui",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
@@ -103,17 +108,27 @@ Navigation entries and order are controlled by the `Section` enum in [src/app.rs
 
 Place a PNG or JPEG at `assets/hero.png`.
 
-- **Aspect**: Roughly square (approx. 60x16 cells).
+- **Aspect**: Roughly square (approx. 60x16 cells; pixel dimensions anywhere from ~120x32 up to **2048x2048**, the pixel-bomb safety cap).
+- **Size cap**: file must be **≤ 10 MiB**. Oversized files are rejected before decode.
 - **Style**: High contrast, brutalist halftone or dithered.
 - **Processing**: Graphics mode uses Lanczos3 downscaling. Ascii mode ramp-maps pixels via `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']`.
-- **Failure**: If the file is missing, a placeholder is rendered.
+- **Failure**: If the file is missing, oversized, or has dimensions over 2048×2048, a `[ HERO ]` placeholder is rendered. The app does NOT panic on bad assets.
+
+## SPEC EXTENSIONS
+
+This implementation extends the brief in two intentional, additive ways. The original controls (↑/↓/Enter/q) and the original 3-region root layout still work; the extensions are pure additions:
+
+- **`j` / `k` navigation aliases** — in addition to ↑/↓, the navigation accepts vim-style `j`/`k`. Both pairs map to the same advance/retreat logic; the footer documents both.
+- **Footer key-hint row** — a 1-row footer below the content panel surfaces the keymap (`UP/DN OR J/K NAVIGATE  ENTER SELECT  Q QUIT`). The brief specifies Hero/Header/Content as the 3-region root layout; this footer is added as a 4th fixed-height region for first-launch discoverability.
+
+`Esc` does **not** quit. Per the brief, the only documented quit key is `q`. Pressing Esc returns `Action::Noop`; the TUI stays running.
 
 ## TESTING
 
 Execution of the test suite and linting:
 
 ```bash
-cargo test         # 44 unit tests
+cargo test         # 51 unit tests
 cargo clippy --all-targets -- -D warnings
 ```
 
