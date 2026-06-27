@@ -82,7 +82,7 @@ impl App {
 
     pub fn handle_key(&mut self, code: KeyCode) -> Action {
         match code {
-            KeyCode::Char('q') | KeyCode::Esc => Action::Quit,
+            KeyCode::Char('q') => Action::Quit,
             KeyCode::Down | KeyCode::Char('j') => {
                 self.next();
                 Action::Noop
@@ -162,9 +162,10 @@ mod tests {
     }
 
     #[test]
-    fn handle_key_esc_returns_quit() {
+    fn handle_key_esc_is_ignored_not_quit() {
         let mut a = fresh();
-        assert_eq!(a.handle_key(KeyCode::Esc), Action::Quit);
+        assert_eq!(a.handle_key(KeyCode::Esc), Action::Noop);
+        assert_eq!(a.selected_section, 0);
     }
 
     #[test]
