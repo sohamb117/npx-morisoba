@@ -11,11 +11,13 @@ pub const RAMP: [char; 10] = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 /// Result has `(h + 1) / 2` lines and `w` columns per line, newline-terminated
 /// each.
 pub fn pixels_to_ascii(luma: &[u8], w: u32, h: u32) -> String {
-    let line_count = h.div_ceil(2) as usize;
-    let mut out = String::with_capacity(line_count * (w as usize + 1));
-    for y in (0..h).step_by(2) {
-        for x in 0..w {
-            let pixel = luma[(y * w + x) as usize] as usize;
+    let w_usize = w as usize;
+    let h_usize = h as usize;
+    let line_count = h_usize.div_ceil(2);
+    let mut out = String::with_capacity(line_count * (w_usize + 1));
+    for y in (0..h_usize).step_by(2) {
+        for x in 0..w_usize {
+            let pixel = luma[y * w_usize + x] as usize;
             let idx = (pixel * RAMP.len() / 256).min(RAMP.len() - 1);
             out.push(RAMP[idx]);
         }
@@ -25,8 +27,19 @@ pub fn pixels_to_ascii(luma: &[u8], w: u32, h: u32) -> String {
 }
 
 pub fn load_and_render(path: &Path, max_w: u32, max_h: u32) -> Option<String> {
-    let reader = image::ImageReader::open(path).ok()?;
-    let decoded = reader.with_guessed_format().ok()?.decode().ok()?;
+    const MAX_BYTES: u64 = 10 * 1024 * 1024;
+    const MAX_DIM: u32 = 8192;
+
+    let meta = std::fs::metadata(path).ok()?;
+    if meta.len() > MAX_BYTES {
+        return None;
+    }
+    let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_DIM);
+    limits.max_image_height = Some(MAX_DIM);
+    reader.limits(limits);
+    let decoded = reader.decode().ok()?;
     let resized = decoded.resize_exact(
         max_w,
         max_h.saturating_mul(2).max(1),

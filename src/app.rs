@@ -42,7 +42,6 @@ pub enum Action {
 }
 
 /// Top-level application state owned by `main()`.
-#[allow(dead_code)]
 pub struct App {
     pub selected_section: usize,
     pub sections: Vec<Section>,

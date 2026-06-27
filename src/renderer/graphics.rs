@@ -24,7 +24,39 @@ pub fn config_for_rect(rect: Rect) -> Config {
     }
 }
 
+pub fn validate_hero_path(path: &Path) -> bool {
+    const MAX_BYTES: u64 = 10 * 1024 * 1024;
+    const MAX_DIM: u32 = 8192;
+
+    let meta = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    if !meta.is_file() || meta.len() > MAX_BYTES {
+        return false;
+    }
+    let Ok(reader) = image::ImageReader::open(path) else {
+        return false;
+    };
+    let Ok(mut reader) = reader.with_guessed_format() else {
+        return false;
+    };
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_DIM);
+    limits.max_image_height = Some(MAX_DIM);
+    reader.limits(limits);
+    match reader.into_dimensions() {
+        Ok((w, h)) => w <= MAX_DIM && h <= MAX_DIM,
+        Err(_) => false,
+    }
+}
+
 pub fn draw_image(path: &Path, rect: Rect) -> std::io::Result<()> {
+    if !validate_hero_path(path) {
+        return Err(std::io::Error::other(
+            "hero image missing, too large, or not a regular file",
+        ));
+    }
     let config = config_for_rect(rect);
     viuer::print_from_file(path, &config)
         .map(|_| ())
@@ -79,5 +111,17 @@ mod tests {
         let c = config_for_rect(Rect::new(0, 0, 0, 0));
         assert_eq!(c.width, Some(0u32));
         assert_eq!(c.height, Some(0u32));
+    }
+
+    #[test]
+    fn validate_hero_path_missing_returns_false() {
+        let p = std::path::Path::new("/this/path/does/not/exist/__missing_hero_x.png");
+        assert!(!validate_hero_path(p));
+    }
+
+    #[test]
+    fn validate_hero_path_directory_returns_false() {
+        let p = std::env::temp_dir();
+        assert!(!validate_hero_path(&p));
     }
 }

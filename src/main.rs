@@ -21,33 +21,54 @@ use std::time::Duration;
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
+const HERO_PATH: &str = "assets/hero.png";
+
 fn main() -> io::Result<()> {
     install_panic_hook();
 
     let mode = renderer::detect_capability();
+    let hero_path = Path::new(HERO_PATH);
     let hero_ascii: Option<String> = if mode == RenderMode::Ascii {
-        renderer::ascii::load_and_render(Path::new("assets/hero.png"), 60, 8)
+        renderer::ascii::load_and_render(hero_path, 60, 8)
     } else {
         None
     };
+    let hero_graphics_ok =
+        mode == RenderMode::Graphics && renderer::graphics::validate_hero_path(hero_path);
 
     let mut terminal = init_terminal()?;
     let mut app = App::new(mode);
-    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_deref(), mode);
+    let result = run_loop(
+        &mut terminal,
+        &mut app,
+        hero_ascii.as_deref(),
+        hero_graphics_ok,
+        hero_path,
+    );
     let _ = restore_terminal();
     result
 }
 
 fn init_terminal() -> io::Result<Term> {
     enable_raw_mode()?;
-    execute!(io::stdout(), EnterAlternateScreen)?;
-    Terminal::new(CrosstermBackend::new(io::stdout()))
+    if let Err(e) = execute!(io::stdout(), EnterAlternateScreen) {
+        let _ = disable_raw_mode();
+        return Err(e);
+    }
+    match Terminal::new(CrosstermBackend::new(io::stdout())) {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+            let _ = disable_raw_mode();
+            Err(e)
+        }
+    }
 }
 
 fn restore_terminal() -> io::Result<()> {
-    disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen)?;
-    Ok(())
+    let r1 = disable_raw_mode();
+    let r2 = execute!(io::stdout(), LeaveAlternateScreen);
+    r1.and(r2)
 }
 
 fn install_panic_hook() {
@@ -62,20 +83,27 @@ fn run_loop(
     terminal: &mut Term,
     app: &mut App,
     hero_ascii: Option<&str>,
-    mode: RenderMode,
+    hero_graphics_ok: bool,
+    hero_path: &Path,
 ) -> io::Result<()> {
+    let mut last_size: Option<(u16, u16)> = None;
+
     loop {
         terminal.draw(|frame| ui::render(frame, app, hero_ascii))?;
 
-        if mode == RenderMode::Graphics {
+        if app.mode == RenderMode::Graphics && hero_graphics_ok {
             let area = terminal.size()?;
-            let hero_rect = ui::compute_hero_rect(area);
-            crossterm::queue!(
-                io::stdout(),
-                crossterm::cursor::MoveTo(hero_rect.x, hero_rect.y)
-            )?;
-            io::stdout().flush()?;
-            let _ = renderer::graphics::draw_image(Path::new("assets/hero.png"), hero_rect);
+            let curr = (area.width, area.height);
+            if last_size != Some(curr) {
+                let hero_rect = ui::compute_hero_rect(area);
+                crossterm::queue!(
+                    io::stdout(),
+                    crossterm::cursor::MoveTo(hero_rect.x, hero_rect.y)
+                )?;
+                io::stdout().flush()?;
+                let _ = renderer::graphics::draw_image(hero_path, hero_rect);
+                last_size = Some(curr);
+            }
         }
 
         if event::poll(Duration::from_millis(250))? {
