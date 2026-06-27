@@ -117,11 +117,13 @@ Navigation order is controlled by the `Section` enum in [src/app.rs](src/app.rs)
 
 Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. Per-item PNGs (optional) go alongside the matching markdown file as `assets/sections/<section>/<slug>.png`.
 
-- **Pixel dimensions**: up to **2048×2048**. Larger images are rejected at load time to bound decode CPU.
+PNG bytes are **embedded at compile time** via `include_bytes!` (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render the hero identically.
+
+- **Pixel dimensions**: up to **2048×2048**. Larger images are rejected at decode time to bound CPU.
 - **File size**: up to **10 MiB**.
 - **In-TUI rendering**: pixels are mapped to the ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` via Luma8 conversion and Lanczos3 downscale.
-- **Full image**: opened on demand via the `i` key in the OS-default viewer.
-- **Missing / bad**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
+- **Full image** (`i` key): the embedded bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened in the OS-default viewer. The temp file is reused across sessions (deterministic hash from the bytes).
+- **Missing hero at build time**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
 
 ## SPEC EXTENSIONS
 
@@ -137,7 +139,7 @@ This implementation extends the original brief in four intentional, additive way
 ## TESTING
 
 ```bash
-cargo test         # 40 unit + integration tests
+cargo test         # 42 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -148,7 +150,7 @@ cargo build --release
 ./tools/wave9_qa.sh
 ```
 
-The harness asserts: first-paint content, full drill-down navigation (Sections → Items → Detail → back → back), clean quit + restored terminal, TMUX-still-shows-ASCII, missing-hero placeholder, resize coherence at 80×24 and 160×50, zero color SGR codes in output, and `i`-key does not crash the TUI. Requires `tmux` on `PATH`.
+The harness asserts: first-paint content, full drill-down navigation (Sections → Items → Detail → back → back), clean quit + restored terminal, TMUX-still-shows-ASCII, **CWD-independence** (hero renders even when run from a CWD with no `assets/` directory — locks in the compile-time embedding invariant), resize coherence at 80×24 and 160×50, zero color SGR codes in output, and `i`-key does not crash the TUI. Requires `tmux` on `PATH`.
 
 ## LICENSE
 
