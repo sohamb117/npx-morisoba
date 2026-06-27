@@ -94,28 +94,10 @@ pub fn render(frame: &mut Frame, app: &mut App, ascii_hero: Option<&str>) {
     frame.render_widget(footer_widget, footer_area);
 }
 
-/// Compute the hero Rect from a terminal area. Single source of truth shared
-/// between `render` (which paints a placeholder) and `main.rs` (which moves the
-/// cursor here and calls viuer post-frame). Keeps the two from drifting.
-#[allow(dead_code)]
-pub fn compute_hero_rect(area: Rect) -> Rect {
-    Rect {
-        x: area.x,
-        y: area.y,
-        width: area.width,
-        height: HERO_HEIGHT.min(area.height),
-    }
-}
-
-// T07 (Wave 2) - RED tests via ratatui TestBackend.
-// We assert the rendered buffer contains required strings, has no foreground
-// or background colors set on any cell (B/W invariant), and that the ABOUT
-// row carries the REVERSED modifier (active-selection indicator).
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::app::App;
-    use crate::renderer::RenderMode;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::style::{Color, Modifier};
@@ -124,7 +106,7 @@ mod tests {
     fn render_to_buffer(width: u16, height: u16, hero: Option<&str>) -> Buffer {
         let backend = TestBackend::new(width, height);
         let mut terminal = Terminal::new(backend).expect("test terminal");
-        let mut app = App::new(RenderMode::Ascii);
+        let mut app = App::new();
         terminal
             .draw(|f| render(f, &mut app, hero))
             .expect("frame draw");
@@ -169,6 +151,15 @@ mod tests {
         assert!(
             buffer_contains(&buf, "Q QUIT") || buffer_contains(&buf, "QUIT"),
             "footer missing Q/QUIT hint"
+        );
+    }
+
+    #[test]
+    fn buffer_contains_image_hint_in_footer() {
+        let buf = render_to_buffer(120, 40, None);
+        assert!(
+            buffer_contains(&buf, "I IMAGE"),
+            "footer missing I IMAGE hint"
         );
     }
 
@@ -245,19 +236,5 @@ mod tests {
     fn renders_with_ascii_hero_text_without_panic() {
         let hero = "######\n@@@@@@\n......";
         let _ = render_to_buffer(120, 40, Some(hero));
-    }
-
-    #[test]
-    fn compute_hero_rect_starts_at_origin_with_positive_height() {
-        let r = compute_hero_rect(Rect::new(0, 0, 120, 40));
-        assert_eq!(r.x, 0, "hero must start at column 0");
-        assert_eq!(r.y, 0, "hero must start at row 0");
-        assert!(r.width > 0, "hero width must be positive");
-        assert!(r.height > 0, "hero height must be positive");
-        assert!(
-            r.height < 40,
-            "hero must not consume entire vertical (got {})",
-            r.height
-        );
     }
 }

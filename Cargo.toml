@@ -1,23 +1,21 @@
 [package]
-name = "ssh-profile-tui"
+name = "morisoba"
 version = "0.1.0"
 edition = "2021"
-description = "Black-and-white brutalist SSH-accessed portfolio TUI"
+description = "MORISOBA - a black-and-white brutalist portfolio TUI"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/morisoba/morisoba"
 publish = false
 
 [[bin]]
-name = "ssh-profile-tui"
+name = "morisoba"
 path = "src/main.rs"
 
 [dependencies]
 ratatui = "0.26"
 crossterm = "0.27"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-# viuer pulls libsixel via its default feature; disable it so we don't need libsixel-dev.
-# kitty + iTerm printers are NOT feature-gated in 0.7, so we still get them.
-viuer = { version = "0.7", default-features = false }
-base64 = "0.22"
+opener = "0.7"
 
 [profile.release]
 opt-level = 3

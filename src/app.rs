@@ -1,7 +1,6 @@
-//! Application state: which section is selected, what render mode the terminal supports,
-//! and the canonical list of portfolio sections.
+//! Application state: which section is selected and the canonical list of
+//! portfolio sections.
 
-use crate::renderer::RenderMode;
 use crossterm::event::KeyCode;
 use ratatui::widgets::ListState;
 
@@ -42,13 +41,17 @@ pub enum Action {
 pub struct App {
     pub selected_section: usize,
     pub sections: Vec<Section>,
-    #[allow(dead_code)]
-    pub mode: RenderMode,
     pub list_state: ListState,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
-    pub fn new(mode: RenderMode) -> Self {
+    pub fn new() -> Self {
         let sections = vec![
             Section::About,
             Section::Projects,
@@ -60,7 +63,6 @@ impl App {
         Self {
             selected_section: 0,
             sections,
-            mode,
             list_state,
         }
     }
@@ -104,11 +106,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::renderer::RenderMode;
     use crossterm::event::KeyCode;
 
     fn fresh() -> App {
-        App::new(RenderMode::Ascii)
+        App::new()
     }
 
     #[test]
