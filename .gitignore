@@ -24,3 +24,9 @@ npm/.cache/
 
 # OpenCode loop state and research notes - not project artifacts
 .omo/
+
+# Wave 2+ WASM build outputs
+dist/
+trunk/
+morisoba-wasm/dist/
+morisoba-wasm/.trunk/

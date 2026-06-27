@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn pick_detail_ascii_falls_back_to_decoded_item_png_when_no_ascii() {
-        let real_png: &[u8] = include_bytes!("../assets/hero.png");
+        let real_png: &[u8] = include_bytes!("../../assets/hero.png");
         let item = mk_item(Some(real_png), None);
         let result = pick_detail_ascii(&item, 36, 14);
         assert!(result.is_some(), "decoded item PNG should produce ASCII");

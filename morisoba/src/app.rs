@@ -1,6 +1,6 @@
 //! Application state: which view, which pane has focus, current selections.
 
-use crossterm::event::KeyCode;
+use crate::event::KeyCode;
 use ratatui::widgets::ListState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,7 +225,7 @@ fn cycle_prev(state: &mut ListState, len: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crossterm::event::KeyCode;
+use crate::event::KeyCode;
 
     fn fresh() -> App {
         App::new()

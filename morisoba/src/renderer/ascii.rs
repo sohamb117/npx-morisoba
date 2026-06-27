@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn real_hero_png_renders_with_grayscale_via_rascii_art() {
-        let hero: &[u8] = include_bytes!("../../assets/hero.png");
+        let hero: &[u8] = include_bytes!("../../../assets/hero.png");
         let txt = load_and_render_bytes(hero, 36, 14).expect("hero should render");
         assert!(!txt.lines.is_empty(), "expected non-empty Text");
         let any_grayscale = txt.lines.iter().any(|l| {

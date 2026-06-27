@@ -1,22 +1,9 @@
-[package]
-name = "morisoba"
-version = "0.1.0"
-edition = "2021"
-description = "MORISOBA - a black-and-white brutalist portfolio TUI"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/morisoba/morisoba"
-publish = false
+[workspace]
+members = ["morisoba"]
+resolver = "2"
 
-[[bin]]
-name = "morisoba"
-path = "src/main.rs"
-
-[dependencies]
-ratatui = "0.30"
-crossterm = "0.28"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
-opener = "0.7"
-rascii_art = "0.4"
+[workspace.metadata]
+description = "MORISOBA - brutalist portfolio TUI. Native + (planned) WASM target via ratzilla."
 
 [profile.release]
 opt-level = 3
