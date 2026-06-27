@@ -42,6 +42,7 @@ The renderer detects terminal capabilities at startup.
 | TERM=xterm-kitty      | Graphics   |
 | TERM_PROGRAM=iTerm.app | Graphics  |
 | TERM_PROGRAM=WezTerm  | Graphics   |
+| LC_TERMINAL=iTerm2 / WezTerm (SSH compatibility) | Graphics |
 | Everything else       | Ascii      |
 
 Graphics mode draws via `viuer` post-frame. If `assets/hero.png` is missing, the application renders a `[ HERO ]` placeholder. Logic is defined in [src/renderer/mod.rs](src/renderer/mod.rs).
@@ -59,6 +60,17 @@ command="/usr/local/bin/ssh-profile-tui",no-port-forwarding,no-X11-forwarding,no
 ```
 
 This method allows different SSH keys to trigger different commands or profile instances.
+
+**Security hardening**: the binary reads `assets/hero.png` relative to the process's current working directory. For ForceCommand deployments, wrap with a tiny shim that switches to a root-owned asset directory first so an SSH-authenticated user cannot control which image is loaded:
+
+```bash
+#!/bin/sh
+# /usr/local/bin/ssh-profile-tui-launch
+cd /usr/local/share/ssh-profile-tui || exit 1
+exec /usr/local/bin/ssh-profile-tui
+```
+
+Then point ForceCommand at `/usr/local/bin/ssh-profile-tui-launch` instead of the binary directly. The same hardening applies to the login-shell method (Method B): place the asset directory somewhere the user cannot write.
 
 ### Method B: As login shell
 
