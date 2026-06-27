@@ -20,7 +20,7 @@
 
 set -u
 WORKDIR="${WORKDIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-BIN="${BIN:-$WORKDIR/target/release/ssh-profile-tui}"
+BIN="${BIN:-$WORKDIR/target/release/morisoba}"
 QA="${QA:-$WORKDIR/.qa}"
 
 mkdir -p "$QA"
