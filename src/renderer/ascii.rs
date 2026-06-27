@@ -28,7 +28,7 @@ pub fn pixels_to_ascii(luma: &[u8], w: u32, h: u32) -> String {
 
 pub fn load_and_render(path: &Path, max_w: u32, max_h: u32) -> Option<String> {
     const MAX_BYTES: u64 = 10 * 1024 * 1024;
-    const MAX_DIM: u32 = 8192;
+    const MAX_DIM: u32 = 2048;
 
     let meta = std::fs::metadata(path).ok()?;
     if meta.len() > MAX_BYTES {

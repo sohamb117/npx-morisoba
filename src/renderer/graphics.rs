@@ -26,7 +26,7 @@ pub fn config_for_rect(rect: Rect) -> Config {
 
 pub fn validate_hero_path(path: &Path) -> bool {
     const MAX_BYTES: u64 = 10 * 1024 * 1024;
-    const MAX_DIM: u32 = 8192;
+    const MAX_DIM: u32 = 2048;
 
     let meta = match std::fs::metadata(path) {
         Ok(m) => m,
@@ -123,5 +123,36 @@ mod tests {
     fn validate_hero_path_directory_returns_false() {
         let p = std::env::temp_dir();
         assert!(!validate_hero_path(&p));
+    }
+
+    #[test]
+    fn validate_hero_path_valid_small_png_returns_true() {
+        let tmp = std::env::temp_dir().join("ssh_tui_test_valid_small.png");
+        let img = image::ImageBuffer::<image::Rgb<u8>, _>::from_pixel(
+            16,
+            16,
+            image::Rgb([0u8, 0, 0]),
+        );
+        img.save(&tmp).expect("write valid test png");
+        let ok = validate_hero_path(&tmp);
+        let _ = std::fs::remove_file(&tmp);
+        assert!(ok, "valid 16x16 PNG within all limits must validate true");
+    }
+
+    #[test]
+    fn validate_hero_path_oversized_dimension_returns_false() {
+        let tmp = std::env::temp_dir().join("ssh_tui_test_oversized_dim.png");
+        let img = image::ImageBuffer::<image::Rgb<u8>, _>::from_pixel(
+            2100,
+            2100,
+            image::Rgb([0u8, 0, 0]),
+        );
+        img.save(&tmp).expect("write oversized test png");
+        let ok = validate_hero_path(&tmp);
+        let _ = std::fs::remove_file(&tmp);
+        assert!(
+            !ok,
+            "2100x2100 PNG must be rejected by 2048 dimension cap"
+        );
     }
 }
