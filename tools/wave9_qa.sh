@@ -205,6 +205,10 @@ else
     HAS_KITTY=no; HAS_ITERM=no
     grep -aPq '\x1b_G'           "$LOG" 2>/dev/null && HAS_KITTY=yes
     grep -aPq '\x1b\]1337;File=' "$LOG" 2>/dev/null && HAS_ITERM=yes
+    if [ "$HAS_KITTY" = no ] && [ "$HAS_ITERM" = no ]; then
+        echo "  S8 no kitty or iTerm graphics-protocol escape detected in PTY output"
+        S8OK=0
+    fi
     echo "  S8 PTY output: kitty_escape=$HAS_KITTY iterm_escape=$HAS_ITERM size_bytes=$SIZE"
     [ $S8OK -eq 1 ] && mark S8 PASS || mark S8 FAIL
 fi

@@ -132,7 +132,7 @@ cargo test         # 51 unit tests
 cargo clippy --all-targets -- -D warnings
 ```
 
-Manual verification scenarios (S1–S7) can be re-run via the bundled harness:
+Manual verification scenarios (S1–S8) can be re-run via the bundled harness:
 
 ```bash
 cargo build --release
