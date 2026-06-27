@@ -1,10 +1,10 @@
-//! ASCII art renderer. Pure pixel→character mapping plus an in-memory loader.
+//! ASCII art renderer — thin wrapper around the [`rascii_art`] crate.
 //!
 //! All asset bytes are embedded at compile time via [`crate::content`]; this
-//! module never touches the filesystem at runtime. Image decode preserves the
-//! source aspect ratio (fits within the requested cell box) and emits a
-//! grayscale-tinted [`Text`] so the brutalist 10-char ramp gets 24 luminance
-//! buckets from the 256-color grayscale palette (codes 232..=255).
+//! module never touches the filesystem at runtime. Image decode + ramp mapping
+//! is delegated to [`rascii_art`]; we layer a 24-level grayscale FG on top via
+//! the 256-color palette (codes 232..=255) so the brutalist 10-char ramp gets
+//! smooth luminance gradients.
 
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
@@ -14,55 +14,10 @@ pub const RAMP: [char; 10] = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 
 const RAMP_STR: [&str; 10] = [" ", ".", ":", "-", "=", "+", "*", "#", "%", "@"];
 
-/// Map a flat Luma8 buffer (`luma.len() == (w * h) as usize`) to an ASCII grid.
-///
-/// Steps the Y axis by 2 to compensate for the ~2:1 terminal cell aspect ratio.
-/// Result has `(h + 1) / 2` lines and `w` columns per line, newline-terminated
-/// each.
-#[cfg(test)]
-fn pixels_to_ascii(luma: &[u8], w: u32, h: u32) -> String {
-    let w_usize = w as usize;
-    let h_usize = h as usize;
-    let line_count = h_usize.div_ceil(2);
-    let mut out = String::with_capacity(line_count * (w_usize + 1));
-    for y in (0..h_usize).step_by(2) {
-        for x in 0..w_usize {
-            let pixel = luma[y * w_usize + x] as usize;
-            let idx = (pixel * RAMP.len() / 256).min(RAMP.len() - 1);
-            out.push(RAMP[idx]);
-        }
-        out.push('\n');
-    }
-    out
-}
-
-/// Same logic as [`pixels_to_ascii`] but emits a [`Text`] with each character
-/// wrapped in its own [`Span`] tinted via the 256-color grayscale palette
-/// (codes 232..=255). The ramp character provides structural texture; the
-/// 24-level grayscale FG carries the actual luminance for smooth gradients.
-pub fn pixels_to_grayscale_text(luma: &[u8], w: u32, h: u32) -> Text<'static> {
-    let w_usize = w as usize;
-    let h_usize = h as usize;
-    let line_count = h_usize.div_ceil(2);
-    let mut lines: Vec<Line<'static>> = Vec::with_capacity(line_count);
-    for y in (0..h_usize).step_by(2) {
-        let mut spans: Vec<Span<'static>> = Vec::with_capacity(w_usize);
-        for x in 0..w_usize {
-            let pixel = luma[y * w_usize + x] as usize;
-            let idx = (pixel * RAMP.len() / 256).min(RAMP.len() - 1);
-            let grey = ((pixel * 24) / 256).min(23) as u8;
-            let style = Style::default().fg(Color::Indexed(232 + grey));
-            spans.push(Span::styled(RAMP_STR[idx], style));
-        }
-        lines.push(Line::from(spans));
-    }
-    Text::from(lines)
-}
-
-/// Decode embedded PNG/JPEG bytes and render to ASCII text that fits within
-/// `max_w` columns × `max_h` rows **preserving the source aspect ratio**.
-/// Returns `None` on any decode failure (corrupt bytes, exceeded limits) —
-/// never panics. Output is a grayscale-tinted [`Text`].
+/// Decode PNG/JPEG bytes via [`rascii_art`] and wrap each output character in
+/// a ratatui [`Span`] tinted with grayscale FG (256-color palette codes
+/// 232..=255). Aspect-ratio + resize handled inside `rascii_art`. Returns
+/// `None` on any decode failure — never panics.
 pub fn load_and_render_bytes(bytes: &[u8], max_w: u32, max_h: u32) -> Option<Text<'static>> {
     const MAX_BYTES: usize = 10 * 1024 * 1024;
     const MAX_DIM: u32 = 2048;
@@ -70,22 +25,64 @@ pub fn load_and_render_bytes(bytes: &[u8], max_w: u32, max_h: u32) -> Option<Tex
     if bytes.len() > MAX_BYTES {
         return None;
     }
-    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+    let mut reader = image::io::Reader::new(std::io::Cursor::new(bytes))
         .with_guessed_format()
         .ok()?;
-    let mut limits = image::Limits::default();
+    let mut limits = image::io::Limits::default();
     limits.max_image_width = Some(MAX_DIM);
     limits.max_image_height = Some(MAX_DIM);
     reader.limits(limits);
-    let decoded = reader.decode().ok()?;
-    let resized = decoded.resize(
-        max_w,
-        max_h.saturating_mul(2).max(1),
-        image::imageops::FilterType::Lanczos3,
-    );
-    let gray = resized.to_luma8();
-    let (w, h) = gray.dimensions();
-    Some(pixels_to_grayscale_text(gray.as_raw(), w, h))
+    let img = reader.decode().ok()?;
+
+    let (target_w, target_h) = fit_within_cells(img.width(), img.height(), max_w, max_h);
+
+    let mut buf = String::new();
+    let opts = rascii_art::RenderOptions::new()
+        .width(target_w)
+        .height(target_h)
+        .colored(false)
+        .charset(&RAMP_STR);
+    rascii_art::render_image_to(&img, &mut buf, &opts).ok()?;
+
+    Some(grayscale_text(&buf))
+}
+
+/// Compute aspect-preserving cell dimensions that fit within `max_w × max_h`,
+/// accounting for the ~2:1 terminal cell ratio (1 cell ≈ 2 vertical pixels).
+/// rascii_art stretches when both `.width` and `.height` are set, so we pass
+/// it dimensions that already preserve the source aspect.
+fn fit_within_cells(src_w: u32, src_h: u32, max_w: u32, max_h: u32) -> (u32, u32) {
+    let src_w = (src_w.max(1)) as u64;
+    let src_h = (src_h.max(1)) as u64;
+    let max_w_u64 = max_w as u64;
+    let max_h_u64 = max_h as u64;
+    let width_limited = max_w_u64 * src_h <= max_h_u64 * 2 * src_w;
+    if width_limited {
+        let th = ((max_w_u64 * src_h) / (src_w * 2)).max(1);
+        (max_w, th.min(max_h_u64) as u32)
+    } else {
+        let tw = ((max_h_u64 * 2 * src_w) / src_h).max(1);
+        (tw.min(max_w_u64) as u32, max_h)
+    }
+}
+
+fn grayscale_text(s: &str) -> Text<'static> {
+    let lines: Vec<Line<'static>> = s
+        .lines()
+        .map(|line| {
+            let spans: Vec<Span<'static>> = line
+                .chars()
+                .map(|c| {
+                    let idx = RAMP.iter().position(|&rc| rc == c).unwrap_or(0);
+                    let grey = ((idx * 23) / (RAMP.len() - 1).max(1)) as u8;
+                    let style = Style::default().fg(Color::Indexed(232 + grey));
+                    Span::styled(RAMP_STR[idx], style)
+                })
+                .collect();
+            Line::from(spans)
+        })
+        .collect();
+    Text::from(lines)
 }
 
 #[cfg(test)]
@@ -103,66 +100,9 @@ mod tests {
     }
 
     #[test]
-    fn all_zero_pixels_map_to_space() {
-        let buf = [0u8; 16];
-        let out = pixels_to_ascii(&buf, 4, 4);
-        for line in out.lines() {
-            assert!(
-                line.chars().all(|c| c == ' '),
-                "expected all spaces, got: {line:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn all_max_pixels_map_to_at_sign() {
-        let buf = [255u8; 16];
-        let out = pixels_to_ascii(&buf, 4, 4);
-        for line in out.lines() {
-            assert!(
-                line.chars().all(|c| c == '@'),
-                "expected all '@', got: {line:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn mid_grey_maps_to_middle_of_ramp() {
-        let buf = [128u8; 4];
-        let out = pixels_to_ascii(&buf, 2, 2);
-        for line in out.lines() {
-            assert!(
-                line.chars().all(|c| c == '+'),
-                "expected all '+', got: {line:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn output_height_is_input_height_div_two_due_to_step_by_2() {
-        let buf = [0u8; 40];
-        let out = pixels_to_ascii(&buf, 4, 10);
-        assert_eq!(out.lines().count(), 5);
-    }
-
-    #[test]
-    fn output_width_equals_input_width() {
-        let buf = [0u8; 12];
-        let out = pixels_to_ascii(&buf, 6, 2);
-        let lines: Vec<&str> = out.lines().collect();
-        assert!(
-            lines.iter().all(|l| l.chars().count() == 6),
-            "expected width 6, got: {lines:?}"
-        );
-    }
-
-    #[test]
     fn load_garbage_bytes_returns_none() {
         let bytes = b"not a valid png or jpeg payload";
-        assert!(
-            load_and_render_bytes(bytes, 10, 10).is_none(),
-            "garbage bytes must NOT panic and MUST return None"
-        );
+        assert!(load_and_render_bytes(bytes, 10, 10).is_none());
     }
 
     #[test]
@@ -177,26 +117,29 @@ mod tests {
     }
 
     #[test]
-    fn grayscale_text_dims_match_div_two_height_and_full_width() {
-        let buf = [0u8; 36 * 14];
-        let txt = pixels_to_grayscale_text(&buf, 36, 14);
-        assert_eq!(txt.lines.len(), 7);
-        assert!(txt.lines.iter().all(|l| l.spans.len() == 36));
+    fn real_hero_png_renders_with_grayscale_via_rascii_art() {
+        let hero: &[u8] = include_bytes!("../../assets/hero.png");
+        let txt = load_and_render_bytes(hero, 36, 14).expect("hero should render");
+        assert!(!txt.lines.is_empty(), "expected non-empty Text");
+        let any_grayscale = txt.lines.iter().any(|l| {
+            l.spans.iter().any(|s| {
+                matches!(s.style.fg, Some(Color::Indexed(n)) if (232..=255).contains(&n))
+            })
+        });
+        assert!(any_grayscale, "expected at least one grayscale Indexed span");
     }
 
     #[test]
-    fn grayscale_text_black_pixel_uses_darkest_grey_232() {
-        let buf = [0u8; 4];
-        let txt = pixels_to_grayscale_text(&buf, 2, 2);
-        let first_span = &txt.lines[0].spans[0];
-        assert_eq!(first_span.style.fg, Some(Color::Indexed(232)));
+    fn grayscale_text_space_char_maps_to_darkest_grey_232() {
+        let txt = grayscale_text(" ");
+        let span = &txt.lines[0].spans[0];
+        assert_eq!(span.style.fg, Some(Color::Indexed(232)));
     }
 
     #[test]
-    fn grayscale_text_white_pixel_uses_brightest_grey_255() {
-        let buf = [255u8; 4];
-        let txt = pixels_to_grayscale_text(&buf, 2, 2);
-        let first_span = &txt.lines[0].spans[0];
-        assert_eq!(first_span.style.fg, Some(Color::Indexed(255)));
+    fn grayscale_text_at_char_maps_to_brightest_grey_255() {
+        let txt = grayscale_text("@");
+        let span = &txt.lines[0].spans[0];
+        assert_eq!(span.style.fg, Some(Color::Indexed(255)));
     }
 }

@@ -2,7 +2,7 @@
 
 A black-and-white brutalist portfolio TUI written in Rust. Three-level navigation: Sections → Items → Detail. Each item has a high-density ASCII hero on the left and a markdown body on the right. Press `i` to open the underlying PNG in your OS-default image viewer. No server, no SSH, no graphics protocol — runs as a single static binary anywhere a TTY exists.
 
-Built with [ratatui 0.26](https://github.com/ratatui-org/ratatui), [crossterm 0.27](https://github.com/crossterm-rs/crossterm), [image 0.25](https://github.com/image-rs/image), and [opener 0.7](https://github.com/Seeker14491/opener).
+Built with [ratatui 0.26](https://github.com/ratatui-org/ratatui), [crossterm 0.27](https://github.com/crossterm-rs/crossterm), [image 0.24](https://github.com/image-rs/image), [opener 0.7](https://github.com/Seeker14491/opener), and [rascii_art 0.4](https://github.com/UTFeight/RASCII) for the image-to-ASCII conversion.
 
 ## INSTALL
 
@@ -128,7 +128,7 @@ Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. **Or** place
 PNG bytes and `.txt` content are **embedded at compile time** via `include_bytes!` and a build-script text reader (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render identically.
 
 - **PNG limits**: up to **2048×2048** pixels, **10 MiB** file size. Larger images are rejected at decode time to bound CPU.
-- **PNG rendering**: **aspect-preserving** Lanczos3 fit inside the target cell box (portraits stay portrait, landscapes stay landscape — no distortion). Each pixel maps to one of the brutalist 10-char ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` AND one of **24 grayscale FG levels** from the 256-color palette (codes 232..=255). Ramp char = structural texture; grayscale = smooth luminance.
+- **PNG rendering**: image decoded via [`image` 0.24](https://github.com/image-rs/image) → handed to [`rascii_art`](https://github.com/UTFeight/RASCII) for the ramp mapping → each output character wrapped in a ratatui `Span` with **24-level grayscale FG** from the 256-color palette (codes 232..=255). Aspect ratio is preserved by computing the fit-within target dimensions before calling rascii_art (which would otherwise stretch when both width + height are set). Brutalist 10-char ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` is passed to rascii_art via `charset`.
 - **`.txt` handling**: embedded verbatim with CRLF → LF normalization at build time. Renders as plain Text without per-cell grayscale (you control the styling by choosing characters). No size cap.
 - **Full image** (`i` key): the embedded **PNG** bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened in the OS-default viewer. `.txt`-only items fall back to the hero PNG; if there is no PNG anywhere, `i` silently no-ops.
 - **Missing hero at build time**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
@@ -148,7 +148,7 @@ This implementation extends the original brief in five intentional, additive way
 ## TESTING
 
 ```bash
-cargo test         # 57 unit + integration tests
+cargo test         # 52 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -169,5 +169,6 @@ MIT OR Apache-2.0
 
 - **ratatui**: 0.26 — terminal UI framework
 - **crossterm**: 0.27 — terminal backend
-- **image**: 0.25 — PNG/JPEG decoding for the ASCII hero
+- **image**: 0.24 — PNG/JPEG decoding (downgraded from 0.25 to match rascii_art's expected DynamicImage type)
+- **rascii_art**: 0.4 — image-to-ASCII ramp mapping (replaces the previous hand-rolled renderer)
 - **opener**: 0.7 — cross-platform OS-default file opener (handles WSL routing too)

@@ -14,8 +14,9 @@ path = "src/main.rs"
 [dependencies]
 ratatui = "0.26"
 crossterm = "0.27"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
 opener = "0.7"
+rascii_art = "0.4"
 
 [profile.release]
 opt-level = 3
