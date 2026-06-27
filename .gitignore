@@ -30,3 +30,6 @@ dist/
 trunk/
 morisoba-wasm/dist/
 morisoba-wasm/.trunk/
+
+# Playwright MCP runtime snapshots (browser automation artifacts, not deliverable)
+.playwright-mcp/
