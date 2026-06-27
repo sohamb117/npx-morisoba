@@ -124,7 +124,7 @@ fn render_footer(frame: &mut Frame, area: Rect, view: View, has_image: bool) {
 }
 
 fn render_menu_view(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'_>>, pane: Pane) {
-    let [hero, header, content, footer] = root_with_hero(frame.size());
+    let [hero, header, content, footer] = root_with_hero(frame.area());
     render_hero(frame, hero, hero_ascii);
     render_header(frame, header);
     let [nav, items] = split_content_nav(content);
@@ -141,7 +141,7 @@ fn render_detail_view(
     item_idx: usize,
     tick_ms: u64,
 ) {
-    let [header, content, footer] = root_no_hero(frame.size());
+    let [header, content, footer] = root_no_hero(frame.area());
     render_header(frame, header);
 
     let items = crate::content::items_for(app.sections[section_idx]);
@@ -209,7 +209,7 @@ mod tests {
     fn row_text(buf: &Buffer, y: u16) -> String {
         let mut s = String::new();
         for x in 0..buf.area.width {
-            s.push_str(buf.get(x, y).symbol());
+            s.push_str(buf[(x, y)].symbol());
         }
         s
     }
@@ -255,10 +255,10 @@ mod tests {
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
                 assert_eq!(
-                    buf.get(x, y).fg,
+                    buf[(x, y)].fg,
                     Color::Reset,
                     "cell ({x},{y}) has fg {:?}",
-                    buf.get(x, y).fg
+                    buf[(x, y)].fg
                 );
             }
         }
@@ -271,10 +271,10 @@ mod tests {
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
                 assert_eq!(
-                    buf.get(x, y).bg,
+                    buf[(x, y)].bg,
                     Color::Reset,
                     "cell ({x},{y}) has bg {:?}",
-                    buf.get(x, y).bg
+                    buf[(x, y)].bg
                 );
             }
         }
@@ -290,7 +290,7 @@ mod tests {
             if !line.contains("ABOUT") {
                 continue;
             }
-            if (0..buf.area.width).any(|x| buf.get(x, y).modifier.contains(Modifier::REVERSED)) {
+            if (0..buf.area.width).any(|x| buf[(x, y)].modifier.contains(Modifier::REVERSED)) {
                 found = true;
                 break;
             }
@@ -354,7 +354,7 @@ mod tests {
             if !line.contains(needle) {
                 continue;
             }
-            if (0..buf.area.width).any(|x| buf.get(x, y).modifier.contains(Modifier::REVERSED)) {
+            if (0..buf.area.width).any(|x| buf[(x, y)].modifier.contains(Modifier::REVERSED)) {
                 found = true;
                 break;
             }

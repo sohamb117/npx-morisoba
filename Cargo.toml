@@ -12,8 +12,8 @@ name = "morisoba"
 path = "src/main.rs"
 
 [dependencies]
-ratatui = "0.26"
-crossterm = "0.27"
+ratatui = "0.30"
+crossterm = "0.28"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
 opener = "0.7"
 rascii_art = "0.4"
