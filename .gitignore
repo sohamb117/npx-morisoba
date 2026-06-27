@@ -1,0 +1,18 @@
+# Build artifacts
+/target
+target/
+
+# WSL out-of-tree target dir (we redirect cargo with CARGO_TARGET_DIR=$HOME/target_morisoba)
+# Local editor swap / OS junk
+*.swp
+*.swo
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# OpenCode loop state and research notes - not project artifacts
+.omo/
