@@ -76,15 +76,18 @@ Every item in every section is a markdown file under [assets/sections/](assets/s
 
 ```
 assets/
-├── hero.png                                    # landing-page hero (above section list)
+├── hero.png                                    # landing-page hero (decoded to ASCII at runtime)
+├── hero.txt                                    # (optional) pre-rendered ASCII — overrides hero.png in-TUI
 └── sections/
     ├── about/
     │   ├── 01-bio.md
+    │   ├── 01-bio.txt                          # (optional) pre-rendered ASCII for this item
     │   ├── 02-philosophy.md
     │   └── 03-off-hours.md
     ├── projects/
     │   ├── 01-distributed-log-engine.md
-    │   ├── 01-distributed-log-engine.png       # (optional) per-item ASCII art
+    │   ├── 01-distributed-log-engine.png       # (optional) per-item image — decoded to ASCII at runtime
+    │   ├── 01-distributed-log-engine.txt       # (optional) pre-rendered — wins over .png in-TUI
     │   ├── 02-tui-framework-mk1.md
     │   └── 03-kernel-trace-toolkit.md
     ├── experience/
@@ -98,8 +101,11 @@ assets/
 1. Drop a markdown file in `assets/sections/<section>/`. Filename becomes the slug (sortable — prefix with `01-`, `02-`, …).
 2. First `# Heading` line becomes the item title shown in the list. If absent, the slug is upper-cased as the title.
 3. Body content (everything after the title line) is rendered verbatim in the right pane of the DETAIL view.
-4. Optionally drop a sibling `.png` with the same stem (e.g. `01-distributed-log-engine.png`) to use as the item's ASCII art in the DETAIL view's left pane. If absent, `assets/hero.png` is used.
-5. Run `cargo build --release` — the build script picks it up automatically.
+4. **Optionally** drop a sibling `<slug>.txt` — pre-rendered ASCII art (e.g. from figlet, an image-to-ASCII tool, or hand-drawn) that appears **verbatim** in the DETAIL view's left pane. CRLF is normalized to LF at build time.
+5. **Or** drop a sibling `<slug>.png` (or `.jpg`) — runtime-decoded to ASCII via the luminance ramp. The PNG is also what the `i` key opens in the OS image viewer.
+6. If both `.txt` and `.png` exist for the same item, `.txt` wins for in-TUI rendering; `.png` is still used by `i`.
+7. Fallback chain (left pane of DETAIL view): per-item `.txt` → decoded per-item `.png` → `hero.txt` → decoded `hero.png` → `[ NO IMAGE ]` placeholder.
+8. Run `cargo build --release` — [build.rs](build.rs) picks everything up automatically.
 
 ### Customizing headers and preambles
 
@@ -117,14 +123,14 @@ Navigation order is controlled by the `Section` enum in [src/app.rs](src/app.rs)
 
 ## HERO ASSET
 
-Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. Per-item PNGs (optional) go alongside the matching markdown file as `assets/sections/<section>/<slug>.png`.
+Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. **Or** place a pre-rendered ASCII text file at `assets/hero.txt` — when present, it takes precedence over the PNG (no decode step). Per-item siblings live alongside the matching markdown file as `assets/sections/<section>/<slug>.{png,txt}`.
 
-PNG bytes are **embedded at compile time** via `include_bytes!` (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render the hero identically.
+PNG bytes and `.txt` content are **embedded at compile time** via `include_bytes!` and a build-script text reader (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render identically.
 
-- **Pixel dimensions**: up to **2048×2048**. Larger images are rejected at decode time to bound CPU.
-- **File size**: up to **10 MiB**.
-- **In-TUI rendering**: pixels are mapped to the ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` via Luma8 conversion and Lanczos3 downscale.
-- **Full image** (`i` key): the embedded bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened in the OS-default viewer. The temp file is reused across sessions (deterministic hash from the bytes).
+- **PNG limits**: up to **2048×2048** pixels, **10 MiB** file size. Larger images are rejected at decode time to bound CPU.
+- **PNG rendering**: pixels are mapped to the ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` via Luma8 conversion and Lanczos3 downscale.
+- **`.txt` handling**: embedded verbatim with CRLF → LF normalization at build time. No size cap (you control your own binary bloat).
+- **Full image** (`i` key): the embedded **PNG** bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened in the OS-default viewer. `.txt`-only items fall back to the hero PNG; if there is no PNG anywhere, `i` silently no-ops.
 - **Missing hero at build time**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
 
 ## SPEC EXTENSIONS
@@ -141,7 +147,7 @@ This implementation extends the original brief in four intentional, additive way
 ## TESTING
 
 ```bash
-cargo test         # 49 unit + integration tests
+cargo test         # 54 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 

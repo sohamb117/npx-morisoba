@@ -140,10 +140,7 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
     if let Some(item) = items.get(item_idx) {
         let [left, right] = split_detail_halves(content);
 
-        let ascii_text = item
-            .png_bytes
-            .or(crate::content::HERO_PNG)
-            .and_then(|b| crate::renderer::ascii::load_and_render_bytes(b, 36, 14))
+        let ascii_text = pick_detail_ascii(item, crate::content::HERO_ASCII, crate::content::HERO_PNG)
             .unwrap_or_else(|| "[ NO IMAGE ]".to_string());
         let ascii_widget = Paragraph::new(ascii_text)
             .block(Block::bordered().title("// IMAGE"))
@@ -157,6 +154,30 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
     }
 
     render_footer(frame, footer, app.view);
+}
+
+pub(crate) fn pick_detail_ascii(
+    item: &crate::content::Item,
+    hero_ascii: Option<&str>,
+    hero_png: Option<&[u8]>,
+) -> Option<String> {
+    if let Some(art) = item.ascii {
+        return Some(art.to_string());
+    }
+    if let Some(b) = item.png_bytes {
+        if let Some(s) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
+            return Some(s);
+        }
+    }
+    if let Some(art) = hero_ascii {
+        return Some(art.to_string());
+    }
+    if let Some(b) = hero_png {
+        if let Some(s) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
+            return Some(s);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -407,5 +428,55 @@ mod tests {
             item_idx: 0,
         };
         let _ = render_view(80, 24, &mut a, None);
+    }
+
+    fn mk_item(
+        png_bytes: Option<&'static [u8]>,
+        ascii: Option<&'static str>,
+    ) -> crate::content::Item {
+        crate::content::Item {
+            slug: "test",
+            title: "TEST",
+            body: "test body",
+            png_bytes,
+            ascii,
+        }
+    }
+
+    #[test]
+    fn pick_detail_ascii_prefers_item_ascii_over_item_png() {
+        let item = mk_item(Some(b"NOT_A_REAL_PNG"), Some("PRE_RENDERED"));
+        let result = pick_detail_ascii(&item, None, None);
+        assert_eq!(result.as_deref(), Some("PRE_RENDERED"));
+    }
+
+    #[test]
+    fn pick_detail_ascii_falls_back_to_decoded_item_png_when_no_ascii() {
+        let real_png: &[u8] = include_bytes!("../assets/hero.png");
+        let item = mk_item(Some(real_png), None);
+        let result = pick_detail_ascii(&item, None, None);
+        assert!(result.is_some(), "decoded item PNG should produce ASCII");
+    }
+
+    #[test]
+    fn pick_detail_ascii_falls_back_to_hero_ascii_when_item_empty() {
+        let item = mk_item(None, None);
+        let result = pick_detail_ascii(&item, Some("HERO_FALLBACK"), None);
+        assert_eq!(result.as_deref(), Some("HERO_FALLBACK"));
+    }
+
+    #[test]
+    fn pick_detail_ascii_falls_back_to_decoded_hero_png_when_no_ascii_at_all() {
+        let real_png: &[u8] = include_bytes!("../assets/hero.png");
+        let item = mk_item(None, None);
+        let result = pick_detail_ascii(&item, None, Some(real_png));
+        assert!(result.is_some(), "decoded hero PNG should produce ASCII");
+    }
+
+    #[test]
+    fn pick_detail_ascii_returns_none_when_nothing_available() {
+        let item = mk_item(None, None);
+        let result = pick_detail_ascii(&item, None, None);
+        assert!(result.is_none());
     }
 }

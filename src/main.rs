@@ -22,8 +22,9 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 fn main() -> io::Result<()> {
     install_panic_hook();
 
-    let hero_ascii: Option<String> = content::HERO_PNG
-        .and_then(|bytes| renderer::ascii::load_and_render_bytes(bytes, 60, 8));
+    let hero_ascii: Option<String> = content::HERO_ASCII.map(str::to_string).or_else(|| {
+        content::HERO_PNG.and_then(|bytes| renderer::ascii::load_and_render_bytes(bytes, 60, 8))
+    });
 
     let mut terminal = init_terminal()?;
     let mut app = App::new();
