@@ -76,7 +76,7 @@ fn run_loop(
                     match app.handle_key(key.code) {
                         Action::Quit => break,
                         Action::OpenImage => {
-                            let _ = opener::open(hero_path);
+                            let _ = open_image(hero_path);
                         }
                         Action::Select | Action::Noop => {}
                     }
@@ -85,4 +85,38 @@ fn run_loop(
         }
     }
     Ok(())
+}
+
+fn open_image(path: &Path) -> io::Result<()> {
+    if opener::open(path).is_ok() {
+        return Ok(());
+    }
+    if is_wsl() {
+        if let Ok(output) = std::process::Command::new("wslpath")
+            .arg("-w")
+            .arg(path)
+            .output()
+        {
+            if output.status.success() {
+                let win_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                return std::process::Command::new("cmd.exe")
+                    .args(["/c", "start", "", &win_path])
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .map(|_| ());
+            }
+        }
+    }
+    Err(io::Error::other("no image opener available"))
+}
+
+fn is_wsl() -> bool {
+    std::fs::read_to_string("/proc/version")
+        .map(|s| {
+            let lower = s.to_ascii_lowercase();
+            lower.contains("microsoft") || lower.contains("wsl")
+        })
+        .unwrap_or(false)
 }
