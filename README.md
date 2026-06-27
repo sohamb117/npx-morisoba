@@ -4,7 +4,7 @@ A black-and-white brutalist SSH-accessed portfolio TUI. Engineered for direct de
 
 ## WHAT
 
-This application serves as a terminal-based professional profile. It adheres to a strict monochrome aesthetic. It supports inline graphics on compatible terminal emulators and falls back to high-density ASCII ramp mapping otherwise.
+This application serves as a terminal-based professional profile. It adheres to a strict monochrome aesthetic. The hero region renders as a high-density ASCII ramp inside the TUI; pressing **`i`** spawns the OS-default image viewer on the local machine so the full-resolution image can be inspected outside the terminal.
 
 ## BUILD
 
@@ -34,18 +34,35 @@ NOTE: TMUX forces Ascii fallback regardless of the `TERM` variable.
 
 ## CAPABILITY MATRIX
 
-The renderer detects terminal capabilities at startup.
+The renderer detects terminal capabilities at startup. **The detection result is currently informational only**: the production hero renderer always uses ASCII ramp mapping, and the original full-resolution image is opened on demand via the **`i`** key (see `## CONTROLS` below). The viuer/graphics infrastructure is kept in the tree (under `#[allow(dead_code)]` in `src/renderer/graphics.rs`) so inline-image rendering can be reactivated later without re-engineering the capability cascade.
 
-| Environment           | Mode       |
-|-----------------------|------------|
-| TMUX env set          | Ascii      |
-| TERM=xterm-kitty      | Graphics   |
-| TERM_PROGRAM=iTerm.app | Graphics  |
-| TERM_PROGRAM=WezTerm  | Graphics   |
+| Environment           | Detected Mode |
+|-----------------------|---------------|
+| TMUX env set          | Ascii         |
+| TERM=xterm-kitty      | Graphics      |
+| TERM_PROGRAM=iTerm.app | Graphics     |
+| TERM_PROGRAM=WezTerm  | Graphics      |
 | LC_TERMINAL=iTerm2 / WezTerm (SSH compatibility) | Graphics |
-| Everything else       | Ascii      |
+| Everything else       | Ascii         |
 
-Graphics mode draws via `viuer` post-frame. If `assets/hero.png` is missing, the application renders a `[ HERO ]` placeholder. Logic is defined in [src/renderer/mod.rs](src/renderer/mod.rs).
+If `assets/hero.png` is missing, oversized (>10 MiB), or exceeds 2048×2048 pixels, a `[ HERO ]` placeholder is rendered instead. Logic is defined in [src/renderer/mod.rs](src/renderer/mod.rs).
+
+## CONTROLS
+
+| Key             | Action                                                       |
+|-----------------|--------------------------------------------------------------|
+| ↑ / ↓ / j / k   | Navigate sections                                            |
+| Enter           | Select (reserved; currently no visible effect)               |
+| **i**           | Open `assets/hero.png` in the OS-default image viewer        |
+| q               | Quit cleanly                                                 |
+| Esc             | No-op (intentionally NOT a quit key; spec lists only `q`)    |
+
+The `i` key dispatches per OS:
+- **Linux**: `xdg-open assets/hero.png` (under WSL this routes via `wslview` → Windows' default image viewer)
+- **macOS**: `open assets/hero.png`
+- **Windows**: `cmd /c start "" assets/hero.png`
+
+The spawn is fire-and-forget — over SSH it runs on the *server's* environment. If the server is headless (typical for an SSH portfolio deployment), the spawn errors silently and the TUI keeps running. There is no client-side display-forwarding magic; for the OS viewer to actually open something visible, you need to run the binary locally OR have X11/Wayland forwarding configured.
 
 ## SSH INTEGRATION
 
@@ -108,18 +125,20 @@ Navigation entries and order are controlled by the `Section` enum in [src/app.rs
 
 Place a PNG or JPEG at `assets/hero.png`.
 
-- **Aspect**: Roughly square (approx. 60x16 cells; pixel dimensions anywhere from ~120x32 up to **2048x2048**, the pixel-bomb safety cap).
+- **Aspect**: Roughly square (approx. 60x16 cells for the in-TUI ASCII render; pixel dimensions anywhere from ~120x32 up to **2048x2048**, the pixel-bomb safety cap).
 - **Size cap**: file must be **≤ 10 MiB**. Oversized files are rejected before decode.
 - **Style**: High contrast, brutalist halftone or dithered.
-- **Processing**: Graphics mode uses Lanczos3 downscaling. Ascii mode ramp-maps pixels via `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']`.
-- **Failure**: If the file is missing, oversized, or has dimensions over 2048×2048, a `[ HERO ]` placeholder is rendered. The app does NOT panic on bad assets.
+- **In-TUI rendering**: pixels are mapped to the ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` via `pixels_to_ascii` (`src/renderer/ascii.rs`). Lanczos3 downscaling.
+- **Original image**: opened on demand via the **`i`** key in the OS-default viewer (see CONTROLS).
+- **Failure**: If the file is missing, oversized, or has dimensions over 2048×2048, a `[ HERO ]` placeholder is rendered inside the TUI. The app does NOT panic on bad assets; the `i` key spawn is fire-and-forget and likewise will not crash the TUI when the asset is absent.
 
 ## SPEC EXTENSIONS
 
-This implementation extends the brief in two intentional, additive ways. The original controls (↑/↓/Enter/q) and the original 3-region root layout still work; the extensions are pure additions:
+This implementation extends the brief in three intentional, additive ways. The original controls (↑/↓/Enter/q) and the original 3-region root layout still work; the extensions are pure additions:
 
 - **`j` / `k` navigation aliases** — in addition to ↑/↓, the navigation accepts vim-style `j`/`k`. Both pairs map to the same advance/retreat logic; the footer documents both.
-- **Footer key-hint row** — a 1-row footer below the content panel surfaces the keymap (`UP/DN OR J/K NAVIGATE  ENTER SELECT  Q QUIT`). The brief specifies Hero/Header/Content as the 3-region root layout; this footer is added as a 4th fixed-height region for first-launch discoverability.
+- **`i` opens the original image in the OS viewer** — the hero region renders as ASCII ramp inside the TUI (always); pressing `i` dispatches `xdg-open` / `open` / `start` so the full-resolution image opens in the local OS-default image viewer. Fire-and-forget; silent over SSH if the server has no display.
+- **Footer key-hint row** — a 1-row footer below the content panel surfaces the keymap (`UP/DN OR J/K NAVIGATE  ENTER SELECT  I IMAGE  Q QUIT`). The brief specifies Hero/Header/Content as the 3-region root layout; this footer is added as a 4th fixed-height region for first-launch discoverability.
 
 `Esc` does **not** quit. Per the brief, the only documented quit key is `q`. Pressing Esc returns `Action::Noop`; the TUI stays running.
 
@@ -128,7 +147,7 @@ This implementation extends the brief in two intentional, additive ways. The ori
 Execution of the test suite and linting:
 
 ```bash
-cargo test         # 51 unit tests
+cargo test         # 52 unit tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -139,7 +158,7 @@ cargo build --release
 ./tools/wave9_qa.sh
 ```
 
-The harness asserts: first-paint content, navigation cycles, clean quit + restored terminal, TMUX forces Ascii fallback, missing-hero placeholder, resize coherence at 80×24 and 160×50, and zero color SGR codes in output. Requires `tmux` on `PATH`.
+The harness asserts: first-paint content, navigation cycles, clean quit + restored terminal, TMUX forces Ascii fallback, missing-hero placeholder, resize coherence at 80×24 and 160×50, zero color SGR codes in output, and `i`-key does not crash the TUI. Requires `tmux` on `PATH`.
 
 ## LICENSE
 
