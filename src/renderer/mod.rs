@@ -21,7 +21,8 @@ pub enum RenderMode {
 ///   1. `TMUX` set → `Ascii` (tmux strips graphics escapes).
 ///   2. `TERM` contains `kitty` → `Graphics`.
 ///   3. `TERM_PROGRAM` is `iTerm.app` or `WezTerm` → `Graphics`.
-///   4. Otherwise → `Ascii`.
+///   4. `LC_TERMINAL` is `iTerm2` or `WezTerm` (SSH-propagated fallback) → `Graphics`.
+///   5. Otherwise → `Ascii`.
 pub fn detect_capability() -> RenderMode {
     if std::env::var("TMUX").is_ok() {
         return RenderMode::Ascii;
@@ -32,6 +33,10 @@ pub fn detect_capability() -> RenderMode {
     }
     let prog = std::env::var("TERM_PROGRAM").unwrap_or_default();
     if prog.contains("iTerm") || prog.contains("WezTerm") {
+        return RenderMode::Graphics;
+    }
+    let lc_term = std::env::var("LC_TERMINAL").unwrap_or_default();
+    if lc_term.contains("iTerm") || lc_term.contains("WezTerm") {
         return RenderMode::Graphics;
     }
     RenderMode::Ascii
@@ -51,6 +56,7 @@ mod tests {
         std::env::remove_var("TMUX");
         std::env::remove_var("TERM");
         std::env::remove_var("TERM_PROGRAM");
+        std::env::remove_var("LC_TERMINAL");
     }
 
     #[test]
@@ -99,6 +105,37 @@ mod tests {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         scrub();
         std::env::set_var("TERM", "xterm-256color");
+        let got = detect_capability();
+        scrub();
+        assert_eq!(got, RenderMode::Ascii);
+    }
+
+    #[test]
+    fn iterm_lc_terminal_yields_graphics() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        scrub();
+        std::env::set_var("LC_TERMINAL", "iTerm2");
+        let got = detect_capability();
+        scrub();
+        assert_eq!(got, RenderMode::Graphics);
+    }
+
+    #[test]
+    fn wezterm_lc_terminal_yields_graphics() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        scrub();
+        std::env::set_var("LC_TERMINAL", "WezTerm");
+        let got = detect_capability();
+        scrub();
+        assert_eq!(got, RenderMode::Graphics);
+    }
+
+    #[test]
+    fn tmux_beats_lc_terminal() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        scrub();
+        std::env::set_var("TMUX", "/tmp/tmux,1,0");
+        std::env::set_var("LC_TERMINAL", "iTerm2");
         let got = detect_capability();
         scrub();
         assert_eq!(got, RenderMode::Ascii);
