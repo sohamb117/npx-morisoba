@@ -174,6 +174,7 @@ fn render_detail_view(
     render_footer(frame, footer, app.view, has_image);
 }
 
+#[allow(unused_variables)]
 pub(crate) fn pick_detail_ascii(
     item: &crate::content::Item,
     max_w: u32,
@@ -182,6 +183,7 @@ pub(crate) fn pick_detail_ascii(
     if let Some(art) = item.ascii {
         return Some(Text::raw(art));
     }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(b) = item.png_bytes {
         return crate::renderer::ascii::load_and_render_bytes(b, max_w, max_h);
     }

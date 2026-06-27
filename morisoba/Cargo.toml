@@ -10,19 +10,24 @@ publish = false
 [[bin]]
 name = "morisoba"
 path = "src/main.rs"
+required-features = ["native"]
 
 [lib]
 name = "morisoba"
 path = "src/lib.rs"
 
+[features]
+default = ["native"]
+native = []
+
 [dependencies]
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
-rascii_art = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ratatui = "0.30"
 crossterm = "0.28"
 opener = "0.7"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
+rascii_art = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 ratatui = { version = "0.30", default-features = false }
