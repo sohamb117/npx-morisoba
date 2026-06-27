@@ -1131,6 +1131,7 @@ name = "morisoba-wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "critical-section",
  "js-sys",
  "morisoba",
  "ratatui",

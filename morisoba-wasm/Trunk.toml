@@ -4,7 +4,7 @@ dist = "dist"
 release = true
 
 [tools]
-wasm_bindgen = "0.2.100"
+wasm_bindgen = "0.2.126"
 
 [serve]
 addresses = ["127.0.0.1"]

@@ -4,9 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>MORISOBA :: A BRUTALIST PORTFOLIO</title>
-  <link data-trunk rel="rust" data-wasm-opt="z" />
-  <link data-trunk rel="css" href="style.css" />
-  <script data-trunk src="desktop.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <script src="desktop.js"></script>
 </head>
 <body class="brutalist-desktop">
   <div id="taskbar">
@@ -23,5 +22,9 @@
       </div>
     </div>
   </div>
+  <script type="module">
+    import init from './morisoba-wasm.js';
+    init();
+  </script>
 </body>
 </html>
