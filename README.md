@@ -58,8 +58,10 @@ In MENU view, both panes are always visible and the right pane updates live as y
 | ↑ / ↓ / j / k           | Move section sel; items refresh live  | Move item selection                          | (no-op)                                      |
 | Enter / → / l           | Shift focus → items pane              | Open item DETAIL                             | (no-op)                                      |
 | Backspace / h / ← / Esc | (no-op — top of nav stack)            | Shift focus → section pane                   | Back to MENU (item pane focus)               |
-| **i**                   | Open `assets/hero.png` (landing hero) | Open highlighted item's PNG (no-op if none)  | Open this item's PNG (no-op if none)         |
+| **i**                   | Open `assets/hero.png` (landing hero) | Open highlighted item's PNG (if authored)    | Open this item's PNG (if authored)           |
 | q                       | Quit                                  | Quit                                         | Quit                                         |
+
+The `I IMAGE` footer hint is **hidden** when the current context has no PNG to open (e.g. an item with no `<slug>.png` authored, or a section list with no `hero.png`). This avoids advertising a key that would be a silent no-op.
 
 The `i` dispatch uses the [`opener`](https://docs.rs/opener) crate, which handles:
 - **Linux / WSL**: `wslview` (when present) → Windows Photos; else `xdg-open` → your desktop file handler; else a built-in WSL fallback uses `wslpath -w` + `cmd.exe /c start`
@@ -128,7 +130,8 @@ Place a PNG or JPEG at `assets/hero.png` for the landing-page hero. **Or** place
 PNG bytes and `.txt` content are **embedded at compile time** via `include_bytes!` and a build-script text reader (driven by [build.rs](build.rs)), so the binary works from any CWD — `cargo install morisoba`, `npx morisoba`, or running the release binary from a tmp dir all render identically.
 
 - **PNG limits**: up to **2048×2048** pixels, **10 MiB** file size. Larger images are rejected at decode time to bound CPU.
-- **PNG rendering**: image decoded via [`image` 0.24](https://github.com/image-rs/image) → handed to [`rascii_art`](https://github.com/UTFeight/RASCII) for the ramp mapping → each output character wrapped in a ratatui `Span` with **24-level grayscale FG** from the 256-color palette (codes 232..=255). Aspect ratio is preserved by computing the fit-within target dimensions before calling rascii_art (which would otherwise stretch when both width + height are set). Brutalist 10-char ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` is passed to rascii_art via `charset`.
+- **PNG rendering**: image decoded via [`image` 0.24](https://github.com/image-rs/image) → handed to [`rascii_art`](https://github.com/UTFeight/RASCII) for the ramp mapping → each output character wrapped in a ratatui `Span` with **24-level grayscale FG** from the 256-color palette (codes 232..=255). **Subpage images are scaled to fill the bordered DETAIL pane** (typically ~78×32 cells at a 160×40 terminal) while preserving aspect ratio via `fit_within_cells`. Brutalist 10-char ramp `[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@']` is passed to rascii_art via `charset`.
+- **Procedural animations**: items that have NEITHER an authored `.png` NOR a `.txt` get an algorithmically-generated moving ASCII pattern instead of a static placeholder. Three generators ship — `plasma`, `rain`, `sine` — dispatched by `slug_hash(item.slug) % 3` so each animated page picks a stable but distinct effect. Animations run at **10 fps** (driven by the 100ms event-loop poll), use the same 256-color grayscale palette as decoded PNGs, and the `tick_ms` parameter is wall-clock-derived (`std::time::Instant::elapsed().as_millis()`) so motion is independent of frame rate jitter. See [src/renderer/animator.rs](src/renderer/animator.rs).
 - **`.txt` handling**: embedded verbatim with CRLF → LF normalization at build time. Renders as plain Text without per-cell grayscale (you control the styling by choosing characters). No size cap.
 - **Full image** (`i` key): opens an image in the OS-default viewer. **The image shown depends on what you have selected:** on section-pane focus the landing `assets/hero.png` is opened; on item-pane focus or DETAIL view the highlighted/viewed item's own `<slug>.png` is opened — and nothing happens if that item has no PNG authored. (No more hero fallback for item-specific contexts; that was a UX trap because every page looked like it shared the bio image.) The chosen PNG bytes are materialized to `$TMPDIR/morisoba-<hash>.png` on first press, then opened via `opener` (or the WSL `cmd.exe /c start` fallback).
 - **Missing hero at build time**: a `[ HERO ]` placeholder is rendered inside the TUI; the app never panics on asset failures.
@@ -148,7 +151,7 @@ This implementation extends the original brief in five intentional, additive way
 ## TESTING
 
 ```bash
-cargo test         # 52 unit + integration tests
+cargo test         # 61 unit + integration tests
 cargo clippy --all-targets -- -D warnings
 ```
 

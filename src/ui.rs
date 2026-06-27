@@ -18,13 +18,13 @@ const HEADER_HEIGHT: u16 = 5;
 const FOOTER_HEIGHT: u16 = 1;
 const NAV_WIDTH: u16 = 22;
 
-pub fn render(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'_>>) {
+pub fn render(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'_>>, tick_ms: u64) {
     match app.view {
         View::Menu { pane } => render_menu_view(frame, app, hero_ascii, pane),
         View::Detail {
             section_idx,
             item_idx,
-        } => render_detail_view(frame, app, section_idx, item_idx),
+        } => render_detail_view(frame, app, section_idx, item_idx, tick_ms),
     }
 }
 
@@ -109,15 +109,16 @@ fn render_item_pane(frame: &mut Frame, area: Rect, app: &mut App, focused: bool)
     frame.render_stateful_widget(widget, area, &mut app.item_list_state);
 }
 
-fn render_footer(frame: &mut Frame, area: Rect, view: View) {
+fn render_footer(frame: &mut Frame, area: Rect, view: View, has_image: bool) {
+    let image_hint = if has_image { "  I IMAGE" } else { "" };
     let text = match view {
         View::Menu {
             pane: Pane::Section,
-        } => "UP/DN NAV  ENTER/RIGHT ITEMS  I IMAGE  Q QUIT",
+        } => format!("UP/DN NAV  ENTER/RIGHT ITEMS{}  Q QUIT", image_hint),
         View::Menu { pane: Pane::Item } => {
-            "UP/DN NAV  ENTER OPEN  BKSP/LEFT BACK  I IMAGE  Q QUIT"
+            format!("UP/DN NAV  ENTER OPEN  BKSP/LEFT BACK{}  Q QUIT", image_hint)
         }
-        View::Detail { .. } => "BKSP/ESC BACK  I IMAGE  Q QUIT",
+        View::Detail { .. } => format!("BKSP/ESC BACK{}  Q QUIT", image_hint),
     };
     frame.render_widget(Paragraph::new(text).alignment(Alignment::Left), area);
 }
@@ -129,10 +130,17 @@ fn render_menu_view(frame: &mut Frame, app: &mut App, hero_ascii: Option<&Text<'
     let [nav, items] = split_content_nav(content);
     render_section_pane(frame, nav, app, pane == Pane::Section);
     render_item_pane(frame, items, app, pane == Pane::Item);
-    render_footer(frame, footer, app.view);
+    let has_image = app.image_to_open().is_some();
+    render_footer(frame, footer, app.view, has_image);
 }
 
-fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item_idx: usize) {
+fn render_detail_view(
+    frame: &mut Frame,
+    app: &mut App,
+    section_idx: usize,
+    item_idx: usize,
+    tick_ms: u64,
+) {
     let [header, content, footer] = root_no_hero(frame.size());
     render_header(frame, header);
 
@@ -140,8 +148,17 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
     if let Some(item) = items.get(item_idx) {
         let [left, right] = split_detail_halves(content);
 
-        let ascii_text = pick_detail_ascii(item, crate::content::HERO_ASCII, crate::content::HERO_PNG)
-            .unwrap_or_else(|| Text::from("[ NO IMAGE ]"));
+        let inner_w = left.width.saturating_sub(2) as u32;
+        let inner_h = left.height.saturating_sub(2) as u32;
+
+        let ascii_text = pick_detail_ascii(item, inner_w, inner_h).unwrap_or_else(|| {
+            crate::renderer::animator::animated_frame(
+                item.slug,
+                inner_w as u16,
+                inner_h as u16,
+                tick_ms,
+            )
+        });
         let ascii_widget = Paragraph::new(ascii_text)
             .block(Block::bordered().title("// IMAGE"))
             .alignment(Alignment::Left);
@@ -153,29 +170,20 @@ fn render_detail_view(frame: &mut Frame, app: &mut App, section_idx: usize, item
         frame.render_widget(body_widget, right);
     }
 
-    render_footer(frame, footer, app.view);
+    let has_image = app.image_to_open().is_some();
+    render_footer(frame, footer, app.view, has_image);
 }
 
 pub(crate) fn pick_detail_ascii(
     item: &crate::content::Item,
-    hero_ascii: Option<&'static str>,
-    hero_png: Option<&[u8]>,
+    max_w: u32,
+    max_h: u32,
 ) -> Option<Text<'static>> {
     if let Some(art) = item.ascii {
         return Some(Text::raw(art));
     }
     if let Some(b) = item.png_bytes {
-        if let Some(t) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
-            return Some(t);
-        }
-    }
-    if let Some(art) = hero_ascii {
-        return Some(Text::raw(art));
-    }
-    if let Some(b) = hero_png {
-        if let Some(t) = crate::renderer::ascii::load_and_render_bytes(b, 36, 14) {
-            return Some(t);
-        }
+        return crate::renderer::ascii::load_and_render_bytes(b, max_w, max_h);
     }
     None
 }
@@ -193,7 +201,7 @@ mod tests {
         let backend = TestBackend::new(width, height);
         let mut terminal = Terminal::new(backend).expect("test terminal");
         terminal
-            .draw(|f| render(f, app, hero))
+            .draw(|f| render(f, app, hero, 0))
             .expect("frame draw");
         terminal.backend().buffer().clone()
     }
@@ -459,7 +467,7 @@ mod tests {
     #[test]
     fn pick_detail_ascii_prefers_item_ascii_over_item_png() {
         let item = mk_item(Some(b"NOT_A_REAL_PNG"), Some("PRE_RENDERED"));
-        let result = pick_detail_ascii(&item, None, None);
+        let result = pick_detail_ascii(&item, 36, 14);
         assert_eq!(text_plain(&result.unwrap()), "PRE_RENDERED");
     }
 
@@ -467,29 +475,28 @@ mod tests {
     fn pick_detail_ascii_falls_back_to_decoded_item_png_when_no_ascii() {
         let real_png: &[u8] = include_bytes!("../assets/hero.png");
         let item = mk_item(Some(real_png), None);
-        let result = pick_detail_ascii(&item, None, None);
+        let result = pick_detail_ascii(&item, 36, 14);
         assert!(result.is_some(), "decoded item PNG should produce ASCII");
-    }
-
-    #[test]
-    fn pick_detail_ascii_falls_back_to_hero_ascii_when_item_empty() {
-        let item = mk_item(None, None);
-        let result = pick_detail_ascii(&item, Some("HERO_FALLBACK"), None);
-        assert_eq!(text_plain(&result.unwrap()), "HERO_FALLBACK");
-    }
-
-    #[test]
-    fn pick_detail_ascii_falls_back_to_decoded_hero_png_when_no_ascii_at_all() {
-        let real_png: &[u8] = include_bytes!("../assets/hero.png");
-        let item = mk_item(None, None);
-        let result = pick_detail_ascii(&item, None, Some(real_png));
-        assert!(result.is_some(), "decoded hero PNG should produce ASCII");
     }
 
     #[test]
     fn pick_detail_ascii_returns_none_when_nothing_available() {
         let item = mk_item(None, None);
-        let result = pick_detail_ascii(&item, None, None);
+        let result = pick_detail_ascii(&item, 36, 14);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn detail_view_footer_omits_image_hint_when_item_has_no_png() {
+        let mut a = App::new();
+        a.view = View::Detail {
+            section_idx: 3,
+            item_idx: 0,
+        };
+        let buf = render_view(120, 40, &mut a, None);
+        assert!(
+            !buffer_contains(&buf, "I IMAGE"),
+            "footer must hide I IMAGE hint when current item has no PNG"
+        );
     }
 }

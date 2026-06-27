@@ -16,7 +16,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Stdout};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
@@ -29,7 +29,8 @@ fn main() -> io::Result<()> {
 
     let mut terminal = init_terminal()?;
     let mut app = App::new();
-    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_ref());
+    let app_start = Instant::now();
+    let result = run_loop(&mut terminal, &mut app, hero_ascii.as_ref(), app_start);
     let _ = restore_terminal();
     result
 }
@@ -64,11 +65,17 @@ fn install_panic_hook() {
     }));
 }
 
-fn run_loop(terminal: &mut Term, app: &mut App, hero_ascii: Option<&Text<'_>>) -> io::Result<()> {
+fn run_loop(
+    terminal: &mut Term,
+    app: &mut App,
+    hero_ascii: Option<&Text<'_>>,
+    app_start: Instant,
+) -> io::Result<()> {
     loop {
-        terminal.draw(|frame| ui::render(frame, app, hero_ascii))?;
+        let tick_ms = app_start.elapsed().as_millis() as u64;
+        terminal.draw(|frame| ui::render(frame, app, hero_ascii, tick_ms))?;
 
-        if event::poll(Duration::from_millis(250))? {
+        if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match app.handle_key(key.code) {
