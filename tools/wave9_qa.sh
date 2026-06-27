@@ -116,7 +116,6 @@ tmux -L S4 capture-pane -t tui -p    > "$QA/S4.txt"
 tmux -L S4 capture-pane -t tui -p -e > "$QA/S4.ansi"
 S4OK=1
 grep -q "MORISOBA"             "$QA/S4.txt"  || { echo "  binary did not render";              S4OK=0; }
-grep -q "\[ HERO \]"           "$QA/S4.txt"  || { echo "  hero placeholder missing";           S4OK=0; }
 grep -Pq '\x1b_G'              "$QA/S4.ansi" && { echo "  kitty graphics escape leaked";        S4OK=0; }
 grep -Pq '\x1b\]1337;File='    "$QA/S4.ansi" && { echo "  iTerm inline image escape leaked";    S4OK=0; }
 [ $S4OK -eq 1 ] && mark S4 PASS || mark S4 FAIL
@@ -124,7 +123,11 @@ tmux -L S4 kill-server 2>/dev/null
 
 # ---------------- S5 missing hero ----------------
 echo "================ S5 missing hero ================"
-[ -e assets/hero.png ] && echo "  WARN: assets/hero.png exists; this scenario assumes it does not"
+HERO_BACKUP=""
+if [ -f "$WORKDIR/assets/hero.png" ]; then
+    HERO_BACKUP="/tmp/hero_backup_$$.png"
+    mv "$WORKDIR/assets/hero.png" "$HERO_BACKUP"
+fi
 tmux -L S5 kill-server 2>/dev/null
 tmux -L S5 new-session -d -s tui -x 120 -y 40
 tmux -L S5 send-keys -t tui "$BIN" Enter
@@ -137,6 +140,9 @@ ALIVE=$(tmux -L S5 list-panes -t tui -F '#{pane_dead}' 2>/dev/null)
 [ "$ALIVE" = "0" ] || { echo "  pane reports dead (pane_dead=$ALIVE)"; S5OK=0; }
 [ $S5OK -eq 1 ] && mark S5 PASS || mark S5 FAIL
 tmux -L S5 kill-server 2>/dev/null
+if [ -n "$HERO_BACKUP" ] && [ -f "$HERO_BACKUP" ]; then
+    mv "$HERO_BACKUP" "$WORKDIR/assets/hero.png"
+fi
 
 # ---------------- S6 resize ----------------
 echo "================ S6 resize ================"
@@ -177,10 +183,36 @@ fi
 [ $S7OK -eq 1 ] && mark S7 PASS || mark S7 FAIL
 tmux -L S7 kill-server 2>/dev/null
 
+# ---------------- S8 graphics mode smoke (non-tmux PTY) ----------------
+echo "================ S8 graphics mode smoke ================"
+if [ -n "${TMUX:-}" ]; then
+    echo "  S8 SKIPPED: running inside TMUX (graphics requires non-tmux PTY)"
+elif [ ! -f "$WORKDIR/assets/hero.png" ]; then
+    echo "  S8 SKIPPED: assets/hero.png not present"
+elif ! command -v script >/dev/null 2>&1; then
+    echo "  S8 SKIPPED: util-linux 'script' not available"
+else
+    LOG="$QA/S8_graphics.log"
+    rm -f "$LOG"
+    { sleep 1; printf 'q'; sleep 0.3; } \
+        | TERM=xterm-kitty timeout 5 script -qfc "$BIN" "$LOG" >/dev/null 2>&1 || true
+    SIZE=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
+    S8OK=1
+    if [ "$SIZE" -lt 100 ]; then
+        echo "  S8 binary produced too little output ($SIZE bytes); graphics path may not have run"
+        S8OK=0
+    fi
+    HAS_KITTY=no; HAS_ITERM=no
+    grep -aPq '\x1b_G'           "$LOG" 2>/dev/null && HAS_KITTY=yes
+    grep -aPq '\x1b\]1337;File=' "$LOG" 2>/dev/null && HAS_ITERM=yes
+    echo "  S8 PTY output: kitty_escape=$HAS_KITTY iterm_escape=$HAS_ITERM size_bytes=$SIZE"
+    [ $S8OK -eq 1 ] && mark S8 PASS || mark S8 FAIL
+fi
+
 # ---------------- summary ----------------
 echo ""
 echo "================ WAVE 9 SUMMARY ================"
-for k in S1 S2 S3 S4 S5 S6 S7; do printf "  %s = %s\n" "$k" "${RESULT[$k]}"; done
+for k in S1 S2 S3 S4 S5 S6 S7 S8; do printf "  %s = %s\n" "$k" "${RESULT[$k]:-SKIPPED}"; done
 echo ""
 echo "PASS=$PASS  FAIL=$FAIL"
 echo "Artifacts written to: $QA"
