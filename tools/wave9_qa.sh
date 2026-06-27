@@ -66,25 +66,44 @@ grep -q "brutalist aesthetic" "$QA/S1.txt" || { echo "  miss About body";  S1OK=
 [ $S1OK -eq 1 ] && mark S1 PASS || mark S1 FAIL
 tmux -L S1 kill-server 2>/dev/null
 
-# ---------------- S2 navigation ----------------
-echo "================ S2 navigation ================"
+# ---------------- S2 navigation + drill-down + back ----------------
+echo "================ S2 navigation + drill-down ================"
 tmux -L S2 kill-server 2>/dev/null
 tmux -L S2 new-session -d -s tui -x 120 -y 40
 tmux -L S2 send-keys -t tui "$BIN" Enter
 sleep 1.0
 tmux -L S2 capture-pane -t tui -p > "$QA/S2_init.txt"
-tmux -L S2 send-keys -t tui Down ; sleep 0.5
-tmux -L S2 capture-pane -t tui -p > "$QA/S2_d.txt"
-tmux -L S2 send-keys -t tui Down ; sleep 0.5
-tmux -L S2 capture-pane -t tui -p > "$QA/S2_dd.txt"
-tmux -L S2 send-keys -t tui Up   ; sleep 0.5
-tmux -L S2 capture-pane -t tui -p > "$QA/S2_ddu.txt"
+
+tmux -L S2 send-keys -t tui Down ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_projects.txt"
+
+tmux -L S2 send-keys -t tui Enter ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_items.txt"
+
+tmux -L S2 send-keys -t tui Down ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_items_d.txt"
+
+tmux -L S2 send-keys -t tui Enter ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_detail.txt"
+
+tmux -L S2 send-keys -t tui BSpace ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_back1.txt"
+
+tmux -L S2 send-keys -t tui BSpace ; sleep 0.4
+tmux -L S2 capture-pane -t tui -p > "$QA/S2_back2.txt"
+
 S2OK=1
-grep -q "brutalist aesthetic"    "$QA/S2_init.txt" || { echo "  init miss About";       S2OK=0; }
-grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_d.txt"    || { echo "  +Down miss Projects";   S2OK=0; }
-grep -q "brutalist aesthetic"    "$QA/S2_d.txt"    && { echo "  +Down About lingers";   S2OK=0; }
-grep -q "SENIOR SWE"             "$QA/S2_dd.txt"   || { echo "  +DD miss Experience";   S2OK=0; }
-grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_ddu.txt"  || { echo "  +DDU miss Projects";    S2OK=0; }
+grep -q "brutalist aesthetic" "$QA/S2_init.txt"     || { echo "  init: miss About preamble";          S2OK=0; }
+grep -q "Selected projects"   "$QA/S2_projects.txt" || { echo "  +Down: miss Projects preamble";      S2OK=0; }
+grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_items.txt" || { echo "  drill: miss DLE in item list";       S2OK=0; }
+grep -q "TUI FRAMEWORK"       "$QA/S2_items.txt"    || { echo "  drill: miss TUI FW in item list";    S2OK=0; }
+grep -q "KERNEL TRACE"        "$QA/S2_items.txt"    || { echo "  drill: miss KTT in item list";       S2OK=0; }
+grep -q "BACK"                "$QA/S2_items.txt"    || { echo "  drill: footer missing BACK hint";    S2OK=0; }
+grep -q "TUI FRAMEWORK"       "$QA/S2_detail.txt"   || { echo "  detail: miss item title";            S2OK=0; }
+grep -q "BACK"                "$QA/S2_detail.txt"   || { echo "  detail: footer missing BACK hint";   S2OK=0; }
+grep -q "// NAV"              "$QA/S2_detail.txt"   && { echo "  detail: NAV should NOT be visible";  S2OK=0; }
+grep -q "DISTRIBUTED LOG ENGINE" "$QA/S2_back1.txt" || { echo "  back1: should be Items view";        S2OK=0; }
+grep -q "Selected projects"   "$QA/S2_back2.txt"    || { echo "  back2: should be Sections view";    S2OK=0; }
 [ $S2OK -eq 1 ] && mark S2 PASS || mark S2 FAIL
 tmux -L S2 kill-server 2>/dev/null
 

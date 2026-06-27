@@ -1,13 +1,8 @@
-//! Application state: which section is selected and the canonical list of
-//! portfolio sections.
+//! Application state: which view is active, which section/item is selected.
 
 use crossterm::event::KeyCode;
 use ratatui::widgets::ListState;
 
-/// The four portfolio sections rendered in the nav.
-///
-/// Section copy lives in `ui.rs` so callers can change the order here without
-/// touching content blobs; the `title()` strings are stable for tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
     About,
@@ -17,7 +12,6 @@ pub enum Section {
 }
 
 impl Section {
-    /// Display title (ALL CAPS, brutalist) — surfaced in the nav widget.
     pub fn title(&self) -> &'static str {
         match self {
             Section::About => "ABOUT",
@@ -28,20 +22,27 @@ impl Section {
     }
 }
 
-/// Result of dispatching a key press through `App::handle_key`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum View {
+    Sections,
+    Items { section_idx: usize },
+    Detail { section_idx: usize, item_idx: usize },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Quit,
-    Select,
     OpenImage,
+    Drill,
+    Back,
     Noop,
 }
 
-/// Top-level application state owned by `main()`.
 pub struct App {
-    pub selected_section: usize,
+    pub view: View,
     pub sections: Vec<Section>,
-    pub list_state: ListState,
+    pub section_list_state: ListState,
+    pub item_list_state: ListState,
 }
 
 impl Default for App {
@@ -58,51 +59,141 @@ impl App {
             Section::Experience,
             Section::Contact,
         ];
-        let mut list_state = ListState::default();
-        list_state.select(Some(0));
+        let mut section_list_state = ListState::default();
+        section_list_state.select(Some(0));
+        let mut item_list_state = ListState::default();
+        item_list_state.select(Some(0));
         Self {
-            selected_section: 0,
+            view: View::Sections,
             sections,
-            list_state,
+            section_list_state,
+            item_list_state,
         }
     }
 
-    pub fn next(&mut self) {
-        let len = self.sections.len();
-        self.selected_section = (self.selected_section + 1) % len;
-        self.list_state.select(Some(self.selected_section));
+    pub fn selected_section_idx(&self) -> usize {
+        self.section_list_state.selected().unwrap_or(0)
     }
 
-    pub fn prev(&mut self) {
-        let len = self.sections.len();
-        self.selected_section = (self.selected_section + len - 1) % len;
-        self.list_state.select(Some(self.selected_section));
+    pub fn current_section(&self) -> Section {
+        let idx = match self.view {
+            View::Sections => self.selected_section_idx(),
+            View::Items { section_idx } | View::Detail { section_idx, .. } => section_idx,
+        };
+        self.sections[idx]
+    }
+
+    pub fn current_item(&self) -> Option<&'static crate::content::Item> {
+        match self.view {
+            View::Items { section_idx } => {
+                let items = crate::content::items_for(self.sections[section_idx]);
+                let idx = self.item_list_state.selected().unwrap_or(0);
+                items.get(idx)
+            }
+            View::Detail {
+                section_idx,
+                item_idx,
+            } => {
+                let items = crate::content::items_for(self.sections[section_idx]);
+                items.get(item_idx)
+            }
+            View::Sections => None,
+        }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) -> Action {
         match code {
-            KeyCode::Char('q') => Action::Quit,
+            KeyCode::Char('q') => return Action::Quit,
+            KeyCode::Char('i') => return Action::OpenImage,
+            _ => {}
+        }
+        match self.view {
+            View::Sections => self.handle_key_sections(code),
+            View::Items { section_idx } => self.handle_key_items(code, section_idx),
+            View::Detail { section_idx, .. } => self.handle_key_detail(code, section_idx),
+        }
+    }
+
+    fn handle_key_sections(&mut self, code: KeyCode) -> Action {
+        match code {
             KeyCode::Down | KeyCode::Char('j') => {
-                self.next();
+                cycle_next(&mut self.section_list_state, self.sections.len());
                 Action::Noop
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                self.prev();
+                cycle_prev(&mut self.section_list_state, self.sections.len());
                 Action::Noop
             }
-            KeyCode::Enter => Action::Select,
-            KeyCode::Char('i') => Action::OpenImage,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                let idx = self.selected_section_idx();
+                if crate::content::items_for(self.sections[idx]).is_empty() {
+                    return Action::Noop;
+                }
+                self.item_list_state.select(Some(0));
+                self.view = View::Items { section_idx: idx };
+                Action::Drill
+            }
             _ => Action::Noop,
         }
     }
 
-    pub fn current_section(&self) -> Section {
-        self.sections[self.selected_section]
+    fn handle_key_items(&mut self, code: KeyCode, section_idx: usize) -> Action {
+        let item_count = crate::content::items_for(self.sections[section_idx]).len();
+        match code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                cycle_next(&mut self.item_list_state, item_count);
+                Action::Noop
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                cycle_prev(&mut self.item_list_state, item_count);
+                Action::Noop
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if item_count == 0 {
+                    return Action::Noop;
+                }
+                let item_idx = self.item_list_state.selected().unwrap_or(0);
+                self.view = View::Detail {
+                    section_idx,
+                    item_idx,
+                };
+                Action::Drill
+            }
+            KeyCode::Backspace | KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
+                self.view = View::Sections;
+                Action::Back
+            }
+            _ => Action::Noop,
+        }
+    }
+
+    fn handle_key_detail(&mut self, code: KeyCode, section_idx: usize) -> Action {
+        match code {
+            KeyCode::Backspace | KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
+                self.view = View::Items { section_idx };
+                Action::Back
+            }
+            _ => Action::Noop,
+        }
     }
 }
 
-// T04 (Wave 2) - RED tests against the unimplemented stub.
-// These panic until T10 supplies real bodies; that panic IS the RED signal.
+fn cycle_next(state: &mut ListState, len: usize) {
+    if len == 0 {
+        return;
+    }
+    let i = state.selected().unwrap_or(0);
+    state.select(Some((i + 1) % len));
+}
+
+fn cycle_prev(state: &mut ListState, len: usize) {
+    if len == 0 {
+        return;
+    }
+    let i = state.selected().unwrap_or(0);
+    state.select(Some((i + len - 1) % len));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,108 +204,143 @@ mod tests {
     }
 
     #[test]
-    fn sections_contains_all_four_variants() {
+    fn starts_in_sections_view_with_about_selected() {
         let a = fresh();
-        assert_eq!(a.sections.len(), 4);
-        assert!(a.sections.contains(&Section::About));
-        assert!(a.sections.contains(&Section::Projects));
-        assert!(a.sections.contains(&Section::Experience));
-        assert!(a.sections.contains(&Section::Contact));
+        assert!(matches!(a.view, View::Sections));
+        assert_eq!(a.selected_section_idx(), 0);
+        assert_eq!(a.current_section(), Section::About);
     }
 
     #[test]
-    fn new_starts_at_zero() {
-        let a = fresh();
-        assert_eq!(a.selected_section, 0);
-        assert_eq!(a.list_state.selected(), Some(0));
-    }
-
-    #[test]
-    fn next_advances_by_one() {
+    fn sections_view_arrows_cycle_sections() {
         let mut a = fresh();
-        a.next();
-        assert_eq!(a.selected_section, 1);
-        assert_eq!(a.list_state.selected(), Some(1));
+        a.handle_key(KeyCode::Down);
+        assert_eq!(a.selected_section_idx(), 1);
+        a.handle_key(KeyCode::Down);
+        a.handle_key(KeyCode::Down);
+        a.handle_key(KeyCode::Down);
+        assert_eq!(a.selected_section_idx(), 0);
+        a.handle_key(KeyCode::Up);
+        assert_eq!(a.selected_section_idx(), 3);
     }
 
     #[test]
-    fn next_wraps_to_zero_past_end() {
+    fn sections_view_jk_cycle_sections() {
         let mut a = fresh();
-        let n = a.sections.len();
-        for _ in 0..n {
-            a.next();
+        a.handle_key(KeyCode::Char('j'));
+        assert_eq!(a.selected_section_idx(), 1);
+        a.handle_key(KeyCode::Char('k'));
+        assert_eq!(a.selected_section_idx(), 0);
+    }
+
+    #[test]
+    fn enter_in_sections_drills_to_items() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Down);
+        let act = a.handle_key(KeyCode::Enter);
+        assert_eq!(act, Action::Drill);
+        assert!(matches!(a.view, View::Items { section_idx: 1 }));
+    }
+
+    #[test]
+    fn right_arrow_in_sections_also_drills() {
+        let mut a = fresh();
+        let act = a.handle_key(KeyCode::Right);
+        assert_eq!(act, Action::Drill);
+        assert!(matches!(a.view, View::Items { section_idx: 0 }));
+    }
+
+    #[test]
+    fn items_view_arrows_cycle_items() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        let count = crate::content::items_for(a.current_section()).len();
+        if count >= 2 {
+            a.handle_key(KeyCode::Down);
+            assert_eq!(a.item_list_state.selected(), Some(1));
         }
-        assert_eq!(a.selected_section, 0);
     }
 
     #[test]
-    fn prev_wraps_to_last_from_zero() {
+    fn enter_in_items_drills_to_detail() {
         let mut a = fresh();
-        a.prev();
-        assert_eq!(a.selected_section, 3);
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Enter);
+        assert_eq!(act, Action::Drill);
+        assert!(matches!(
+            a.view,
+            View::Detail {
+                section_idx: 0,
+                item_idx: 0
+            }
+        ));
     }
 
     #[test]
-    fn handle_key_q_returns_quit() {
+    fn backspace_from_items_returns_to_sections() {
         let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Backspace);
+        assert_eq!(act, Action::Back);
+        assert!(matches!(a.view, View::Sections));
+    }
+
+    #[test]
+    fn esc_from_items_returns_to_sections() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Esc);
+        assert_eq!(act, Action::Back);
+        assert!(matches!(a.view, View::Sections));
+    }
+
+    #[test]
+    fn h_from_items_returns_to_sections() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Char('h'));
+        assert_eq!(act, Action::Back);
+        assert!(matches!(a.view, View::Sections));
+    }
+
+    #[test]
+    fn backspace_from_detail_returns_to_items() {
+        let mut a = fresh();
+        a.handle_key(KeyCode::Enter);
+        a.handle_key(KeyCode::Enter);
+        let act = a.handle_key(KeyCode::Backspace);
+        assert_eq!(act, Action::Back);
+        assert!(matches!(a.view, View::Items { section_idx: 0 }));
+    }
+
+    #[test]
+    fn q_quits_from_any_view() {
+        let mut a = fresh();
+        assert_eq!(a.handle_key(KeyCode::Char('q')), Action::Quit);
+        a.view = View::Items { section_idx: 1 };
+        assert_eq!(a.handle_key(KeyCode::Char('q')), Action::Quit);
+        a.view = View::Detail {
+            section_idx: 1,
+            item_idx: 0,
+        };
         assert_eq!(a.handle_key(KeyCode::Char('q')), Action::Quit);
     }
 
     #[test]
-    fn handle_key_esc_is_ignored_not_quit() {
-        let mut a = fresh();
-        assert_eq!(a.handle_key(KeyCode::Esc), Action::Noop);
-        assert_eq!(a.selected_section, 0);
-    }
-
-    #[test]
-    fn handle_key_down_and_j_both_advance() {
-        let mut a = fresh();
-        assert_eq!(a.handle_key(KeyCode::Down), Action::Noop);
-        assert_eq!(a.selected_section, 1);
-        a.handle_key(KeyCode::Char('j'));
-        assert_eq!(a.selected_section, 2);
-    }
-
-    #[test]
-    fn handle_key_up_and_k_both_retreat() {
-        let mut a = fresh();
-        a.handle_key(KeyCode::Up);
-        assert_eq!(a.selected_section, 3);
-        a.handle_key(KeyCode::Char('k'));
-        assert_eq!(a.selected_section, 2);
-    }
-
-    #[test]
-    fn handle_key_enter_returns_select() {
-        let mut a = fresh();
-        assert_eq!(a.handle_key(KeyCode::Enter), Action::Select);
-    }
-
-    #[test]
-    fn handle_key_i_returns_open_image() {
+    fn i_returns_open_image_from_any_view() {
         let mut a = fresh();
         assert_eq!(a.handle_key(KeyCode::Char('i')), Action::OpenImage);
-        assert_eq!(a.selected_section, 0);
+        a.view = View::Detail {
+            section_idx: 0,
+            item_idx: 0,
+        };
+        assert_eq!(a.handle_key(KeyCode::Char('i')), Action::OpenImage);
     }
 
     #[test]
-    fn handle_key_unknown_returns_noop() {
+    fn unknown_key_returns_noop() {
         let mut a = fresh();
         assert_eq!(a.handle_key(KeyCode::Char('z')), Action::Noop);
-        assert_eq!(a.selected_section, 0);
-    }
-
-    #[test]
-    fn current_section_reflects_selected_index() {
-        let mut a = fresh();
-        assert_eq!(a.current_section(), Section::About);
-        a.next();
-        assert_eq!(a.current_section(), Section::Projects);
-        a.next();
-        assert_eq!(a.current_section(), Section::Experience);
-        a.next();
-        assert_eq!(a.current_section(), Section::Contact);
     }
 
     #[test]
@@ -232,5 +358,15 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), titles.len(), "section titles not distinct");
+    }
+
+    #[test]
+    fn current_section_reflects_view() {
+        let mut a = fresh();
+        assert_eq!(a.current_section(), Section::About);
+        a.handle_key(KeyCode::Down);
+        assert_eq!(a.current_section(), Section::Projects);
+        a.handle_key(KeyCode::Enter);
+        assert_eq!(a.current_section(), Section::Projects);
     }
 }

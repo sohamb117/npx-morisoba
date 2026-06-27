@@ -1,4 +1,5 @@
 mod app;
+mod content;
 mod renderer;
 mod ui;
 
@@ -76,9 +77,14 @@ fn run_loop(
                     match app.handle_key(key.code) {
                         Action::Quit => break,
                         Action::OpenImage => {
-                            let _ = open_image(hero_path);
+                            let target = app
+                                .current_item()
+                                .and_then(|i| i.png_path)
+                                .map(Path::new)
+                                .unwrap_or(hero_path);
+                            let _ = open_image(target);
                         }
-                        Action::Select | Action::Noop => {}
+                        Action::Drill | Action::Back | Action::Noop => {}
                     }
                 }
             }
