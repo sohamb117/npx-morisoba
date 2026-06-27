@@ -89,7 +89,7 @@ pub fn render(frame: &mut Frame, app: &mut App, ascii_hero: Option<&str>) {
         .wrap(Wrap { trim: false });
     frame.render_widget(content_widget, main_area);
 
-    let footer_widget = Paragraph::new("UP/DN OR J/K NAVIGATE  ENTER SELECT  Q QUIT")
+    let footer_widget = Paragraph::new("UP/DN OR J/K NAVIGATE  ENTER SELECT  I IMAGE  Q QUIT")
         .alignment(Alignment::Left);
     frame.render_widget(footer_widget, footer_area);
 }
@@ -97,6 +97,7 @@ pub fn render(frame: &mut Frame, app: &mut App, ascii_hero: Option<&str>) {
 /// Compute the hero Rect from a terminal area. Single source of truth shared
 /// between `render` (which paints a placeholder) and `main.rs` (which moves the
 /// cursor here and calls viuer post-frame). Keeps the two from drifting.
+#[allow(dead_code)]
 pub fn compute_hero_rect(area: Rect) -> Rect {
     Rect {
         x: area.x,

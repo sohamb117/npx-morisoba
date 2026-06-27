@@ -12,6 +12,7 @@ use viuer::Config;
 /// Width and height are clamped one cell smaller than the Rect to avoid the
 /// scroll-tear viuer triggers when the image bottom edge collides with the
 /// terminal scroll region.
+#[allow(dead_code)]
 pub fn config_for_rect(rect: Rect) -> Config {
     Config {
         absolute_offset: true,
@@ -24,6 +25,7 @@ pub fn config_for_rect(rect: Rect) -> Config {
     }
 }
 
+#[allow(dead_code)]
 pub fn validate_hero_path(path: &Path) -> bool {
     const MAX_BYTES: u64 = 10 * 1024 * 1024;
     const MAX_DIM: u32 = 2048;
@@ -51,6 +53,7 @@ pub fn validate_hero_path(path: &Path) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub fn draw_image(path: &Path, rect: Rect) -> std::io::Result<()> {
     if !validate_hero_path(path) {
         return Err(std::io::Error::other(
