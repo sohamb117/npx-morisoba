@@ -33,8 +33,8 @@ Downloads a prebuilt binary from GitHub Releases. Faster than `cargo install`, n
 ### From source
 
 ```bash
-git clone https://github.com/morisoba/morisoba
-cd morisoba
+git clone https://github.com/sohamb117/npx-morisoba
+cd npx-morisoba
 cargo build --release
 ./target/release/morisoba
 ```
@@ -51,7 +51,23 @@ The binary needs a real TTY for raw mode + alternate screen. Plain shell prompts
 
 morisoba runs in the browser as a WASM bundle via [ratzilla](https://github.com/ratatui/ratzilla) — same Rust source, different terminal backend. Each item's images open as draggable sibling windows in a brutalist HTML "desktop." Static hosting, no backend.
 
-**Live**: <https://morisoba.github.io/morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
+**Live**: <https://sohamb117.github.io/npx-morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
+
+**GCP deployment**: the same static WASM bundle can run on Cloud Run. Install the
+`wasm32-unknown-unknown` Rust target and `wasm-bindgen-cli` version `0.2.126`, then:
+
+```bash
+GCP_PROJECT=personal-use-493017 bash tools/deploy-gcp.sh
+```
+
+The deployment uses the `morisoba` Artifact Registry repository in `us-east1`,
+which must exist with Cloud Build, Artifact Registry, and Cloud Run APIs enabled.
+Cloud Run serves the site publicly with zero minimum instances and a maximum of two.
+
+**npm releases**: push a `v<version>` tag after keeping `npm/package.json` and
+`morisoba/Cargo.toml` versions aligned. The release workflow builds Linux x64,
+macOS Intel/Apple Silicon, and Windows x64 binaries. Wait for all release assets
+before running `cd npm && npm publish --access public`.
 
 **Local dev**:
 

@@ -23,6 +23,15 @@ use std::time::{Duration, Instant};
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
 fn main() -> io::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("morisoba {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        println!("MORISOBA — a brutalist portfolio TUI\n\nUsage: morisoba [--version | --help]\n\nNavigate with arrow keys or hjkl; Enter opens an item; q quits.\nRequires an interactive terminal.");
+        return Ok(());
+    }
     install_panic_hook();
 
     let hero_ascii: Option<Text<'static>> = content::HERO_ASCII.map(Text::raw).or_else(|| {

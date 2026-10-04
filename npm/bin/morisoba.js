@@ -6,7 +6,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 const pkg = require(path.join(__dirname, '..', 'package.json'));
-const REPO = process.env.MORISOBA_REPO || 'morisoba/morisoba';
+const REPO = process.env.MORISOBA_REPO || 'sohamb117/npx-morisoba';
 
 function platformKey() {
   const p = process.platform;
@@ -57,13 +57,13 @@ async function ensureBinary() {
   const { name } = platformKey();
   const url = `https://github.com/${REPO}/releases/download/v${pkg.version}/${name}`;
   process.stderr.write(`morisoba: fetching ${name} v${pkg.version} from GitHub Releases...\n`);
-  const tmp = dest + '.partial';
+  const tmp = dest + `.${process.pid}.partial`;
   try {
     await download(url, tmp);
-    fs.renameSync(tmp, dest);
     if (process.platform !== 'win32') {
-      fs.chmodSync(dest, 0o755);
+      fs.chmodSync(tmp, 0o755);
     }
+    fs.renameSync(tmp, dest);
     process.stderr.write(`morisoba: cached at ${dest}\n`);
     return dest;
   } catch (err) {

@@ -1,6 +1,6 @@
 # morisoba (npm wrapper)
 
-This npm package is a thin wrapper that downloads the appropriate prebuilt `morisoba` Rust binary from [GitHub Releases](https://github.com/morisoba/morisoba/releases) on first run, caches it under `$HOME/.cache/morisoba/v<version>/`, and execs it.
+This npm package is a thin wrapper that downloads the appropriate prebuilt `morisoba` Rust binary from [GitHub Releases](https://github.com/sohamb117/npx-morisoba/releases) on first run, caches it under `$HOME/.cache/morisoba/v<version>/`, and execs it.
 
 ## USAGE
 
@@ -22,13 +22,13 @@ morisoba
 - macOS aarch64 (Apple Silicon)
 - Windows x86_64
 
-For other platforms, build from source: see the main [README](https://github.com/morisoba/morisoba#readme).
+For other platforms, build from source: see the main [README](https://github.com/sohamb117/npx-morisoba#readme).
 
 ## CONFIGURATION
 
 | Env var | Default | Description |
 |---|---|---|
-| `MORISOBA_REPO` | `morisoba/morisoba` | GitHub repo to fetch releases from. Override for forks. |
+| `MORISOBA_REPO` | `sohamb117/npx-morisoba` | GitHub repo to fetch releases from. Override for forks. |
 
 ## WHAT IT DOES
 
@@ -44,4 +44,4 @@ The download happens once per version. After that, `npx morisoba` is fully offli
 
 ## LICENSE
 
-MIT OR Apache-2.0. Source: https://github.com/morisoba/morisoba
+MIT OR Apache-2.0. Source: https://github.com/sohamb117/npx-morisoba

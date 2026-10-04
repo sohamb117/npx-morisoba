@@ -17,7 +17,7 @@ export PATH="${HOME}/.cargo/bin:$PATH"
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${WORKSPACE_ROOT}/target}"
 export CARGO_TARGET_DIR
 
-WASM_BINDGEN="${WASM_BINDGEN:-${HOME}/.cache/trunk/wasm-bindgen-0.2.126/wasm-bindgen}"
+WASM_BINDGEN="${WASM_BINDGEN:-$(command -v wasm-bindgen || true)}"
 if [ ! -x "$WASM_BINDGEN" ]; then
     echo "wasm-bindgen 0.2.126 not found at $WASM_BINDGEN" >&2
     echo "Install via: cargo install wasm-bindgen-cli --version 0.2.126 --locked" >&2
@@ -34,7 +34,7 @@ fi
 mkdir -p "$DIST"
 
 echo "[1/4] cargo build --target wasm32-unknown-unknown -p morisoba-wasm --release"
-(cd "$WORKSPACE_ROOT" && cargo build --target wasm32-unknown-unknown -p morisoba-wasm --release)
+(cd "$WORKSPACE_ROOT" && cargo build --locked --target wasm32-unknown-unknown -p morisoba-wasm --release)
 
 WASM_SRC="${CARGO_TARGET_DIR}/wasm32-unknown-unknown/release/morisoba_wasm.wasm"
 if [ ! -f "$WASM_SRC" ]; then
@@ -59,10 +59,10 @@ echo "[4/4] verify bundle"
 ls -lh "$DIST/"
 WASM_BG="${DIST}/morisoba-wasm_bg.wasm"
 if [ -f "$WASM_BG" ]; then
-    RAW=$(stat -c%s "$WASM_BG")
+    RAW=$(wc -c < "$WASM_BG")
     GZ=$(gzip --stdout "$WASM_BG" | wc -c)
-    printf "wasm raw:      %12d bytes  (%6.1f KB)\n" "$RAW" "$(echo "scale=1; $RAW/1024" | bc)"
-    printf "wasm gzipped:  %12d bytes  (%6.1f KB)\n" "$GZ"  "$(echo "scale=1; $GZ/1024"  | bc)"
+    printf "wasm raw:      %12d bytes\n" "$RAW"
+    printf "wasm gzipped:  %12d bytes\n" "$GZ"
 fi
 
 echo ""

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "MORISOBA - a black-and-white brutalist portfolio TUI"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/morisoba/morisoba"
+repository = "https://github.com/sohamb117/npx-morisoba"
 publish = false
 
 [[bin]]

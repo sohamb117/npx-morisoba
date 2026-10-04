@@ -4,13 +4,13 @@
   "description": "Black-and-white brutalist portfolio TUI. Run with `npx morisoba`.",
   "license": "MIT OR Apache-2.0",
   "author": "MORISOBA",
-  "homepage": "https://github.com/morisoba/morisoba",
+  "homepage": "https://github.com/sohamb117/npx-morisoba",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/morisoba/morisoba.git"
+    "url": "git+https://github.com/sohamb117/npx-morisoba.git"
   },
   "bugs": {
-    "url": "https://github.com/morisoba/morisoba/issues"
+    "url": "https://github.com/sohamb117/npx-morisoba/issues"
   },
   "keywords": [
     "tui",
