@@ -53,6 +53,8 @@ morisoba runs in the browser as a WASM bundle via [ratzilla](https://github.com/
 
 **Live**: <https://sohamb117.github.io/npx-morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
 
+**Cloud Run mirror**: <https://morisoba-702656615053.us-east1.run.app>
+
 **GCP deployment**: the same static WASM bundle can run on Cloud Run. Install the
 `wasm32-unknown-unknown` Rust target and `wasm-bindgen-cli` version `0.2.126`, then:
 
