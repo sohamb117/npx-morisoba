@@ -1,4 +1,8 @@
-# morisoba (npm wrapper)
+# morisoba
+
+Soham Bhattacharya’s interactive portfolio: bio, projects, experience, and contact details.
+
+Use the terminal below or [open the web version](https://npx.morisoba.moe).
 
 This npm package is a thin wrapper that downloads the appropriate prebuilt `morisoba` Rust binary from [GitHub Releases](https://github.com/sohamb117/npx-morisoba/releases) on first run, caches it under `$HOME/.cache/morisoba/v<version>/`, and execs it.
 

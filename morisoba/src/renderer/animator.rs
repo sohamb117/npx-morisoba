@@ -282,22 +282,13 @@ mod tests {
 
     #[test]
     fn dispatch_covers_all_animators_across_actual_content_slugs() {
-        let slugs = [
-            "02-philosophy",
-            "03-off-hours",
-            "01-distributed-log-engine",
-            "02-tui-framework-mk1",
-            "03-kernel-trace-toolkit",
-            "01-systems-corp",
-            "02-rust-startup",
-            "03-web-agency",
-            "01-github",
-            "02-email",
-            "03-location",
-        ];
         let mut counts = [0u32; 5];
-        for slug in slugs {
-            counts[dispatch_index(slug, 5)] += 1;
+        for section in crate::app::App::new().sections {
+            for item in crate::content::items_for(section) {
+                if item.png_bytes.is_none() && item.ascii.is_none() {
+                    counts[dispatch_index(item.slug, 5)] += 1;
+                }
+            }
         }
         eprintln!("animator distribution across actual slugs: {:?}", counts);
         assert!(

@@ -51,7 +51,9 @@ The binary needs a real TTY for raw mode + alternate screen. Plain shell prompts
 
 morisoba runs in the browser as a WASM bundle via [ratzilla](https://github.com/ratatui/ratzilla) — same Rust source, different terminal backend. Each item's images open as draggable sibling windows in a brutalist HTML "desktop." Static hosting, no backend.
 
-**Live**: <https://sohamb117.github.io/npx-morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
+**Live**: <https://npx.morisoba.moe>
+
+**GitHub Pages mirror**: <https://sohamb117.github.io/npx-morisoba/> *(auto-deployed on push to master via [.github/workflows/pages.yml](.github/workflows/pages.yml))*
 
 **Cloud Run mirror**: <https://morisoba-702656615053.us-east1.run.app>
 
@@ -148,17 +150,9 @@ assets/
 7. Fallback chain (left pane of DETAIL view): per-item `.txt` → decoded per-item `.png` → `hero.txt` → decoded `hero.png` → `[ NO IMAGE ]` placeholder.
 8. Run `cargo build --release` — [build.rs](build.rs) picks everything up automatically.
 
-### Customizing headers and preambles
+### Updating the profile
 
-These literals are still in source (no markdown indirection); edit them in [src/ui.rs](src/ui.rs):
-
-- **src/ui.rs:70**: Main name / moniker (default: "MORISOBA")
-- **src/ui.rs:72**: Role / Tagline (default: "SOFTWARE ENGINEER // SYSTEMS // RUST")
-- **src/ui.rs:74**: Sub-tagline / Vibe (default: "BRUTALIST PORTFOLIO TUI :: SSH PROFILE")
-- **src/ui.rs:110**: About-section preamble (shown above item list)
-- **src/ui.rs:112**: Projects-section preamble
-- **src/ui.rs:114**: Experience-section preamble
-- **src/ui.rs:116**: Contact-section preamble
+Bio, projects, experience, and contact details live in `assets/sections/` and are embedded into both the native and web builds. The profile is based on [morisoba.moe](https://morisoba.moe) and its public resume. Update the name and tagline in `morisoba/src/ui.rs`.
 
 Navigation order is controlled by the `Section` enum in [src/app.rs](src/app.rs).
 
@@ -214,3 +208,22 @@ MIT OR Apache-2.0
 - **image**: 0.24 — PNG/JPEG decoding (downgraded from 0.25 to match rascii_art's expected DynamicImage type)
 - **rascii_art**: 0.4 — image-to-ASCII ramp mapping (replaces the previous hand-rolled renderer)
 - **opener**: 0.7 — cross-platform OS-default file opener (handles WSL routing too)
+
+## Cloudflare deployment
+
+The production web portfolio is served by the separate `morisoba-npx` Worker at
+<https://npx.morisoba.moe>. It serves only the compiled static WASM bundle and does
+not share the main site's Worker or database.
+
+Install the `wasm32-unknown-unknown` Rust target and `wasm-bindgen-cli` 0.2.126,
+then sign in with `npx wrangler@4.152.0 login` and run:
+
+```bash
+bash morisoba-wasm/build.sh
+npx wrangler@4.152.0 deploy
+```
+
+`wrangler.jsonc` configures the custom domain and static assets. Rebuild before
+each deployment so the web portfolio contains the current embedded profile.
+Native releases require matching Cargo/npm versions, the `v<version>` GitHub
+release with all four platform binaries, and then `npm publish ./npm`.
