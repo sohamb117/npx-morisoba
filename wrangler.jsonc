@@ -1,0 +1,13 @@
+{
+  "name": "morisoba-npx",
+  "account_id": "78e4c4fd641dd66cd98516f31ed16dc3",
+  "compatibility_date": "2026-10-25",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "npx.morisoba.moe", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./morisoba-wasm/dist",
+    "not_found_handling": "404-page"
+  }
+}

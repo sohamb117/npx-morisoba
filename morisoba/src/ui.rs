@@ -67,11 +67,8 @@ fn render_hero(frame: &mut Frame, area: Rect, hero_ascii: Option<&Text<'_>>) {
 }
 
 fn render_header(frame: &mut Frame, area: Rect) {
-    // CUSTOMIZE: Main name / moniker
-    let line1 = Line::raw("MORISOBA");
-    // CUSTOMIZE: Role / Tagline
-    let line2 = Line::raw("SOFTWARE ENGINEER // SYSTEMS // RUST");
-    // CUSTOMIZE: Sub-tagline / Vibe
+    let line1 = Line::raw("SOHAM BHATTACHARYA / MORISOBA");
+    let line2 = Line::raw("DATA ENGINEERING // APPLIED AI // SECURITY");
     let line3 = Line::raw("BRUTALIST PORTFOLIO TUI");
     let text = Text::from(vec![line1, line2, line3]);
     frame.render_widget(Paragraph::new(text).block(Block::bordered()), area);

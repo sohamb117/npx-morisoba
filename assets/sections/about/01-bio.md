@@ -1,8 +1,9 @@
 # BIO
 
-MORISOBA is a senior software engineer based in the SF Bay Area.
+I'm Soham Bhattacharya, also known as morisoba.
 
-Areas of focus:
-- Distributed systems
-- Rust, kernel-adjacent code, latency-sensitive workloads
-- Brutalist aesthetic in everything from CLIs to typography
+I study Computer Science and Economics at New York University, with a minor in Policy and Business Management. I'm currently on leave.
+
+I specialize in critical, high-scale data engineering and applied AI. I previously worked on AI security at Microsoft.
+
+https://morisoba.moe

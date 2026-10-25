@@ -1,10 +1,10 @@
 {
   "name": "morisoba",
-  "version": "0.1.0",
-  "description": "Black-and-white brutalist portfolio TUI. Run with `npx morisoba`.",
+  "version": "0.1.1",
+  "description": "Soham Bhattacharya's interactive terminal portfolio. Run with npx morisoba.",
   "license": "MIT OR Apache-2.0",
-  "author": "MORISOBA",
-  "homepage": "https://github.com/sohamb117/npx-morisoba",
+  "author": "Soham Bhattacharya",
+  "homepage": "https://npx.morisoba.moe",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sohamb117/npx-morisoba.git"
